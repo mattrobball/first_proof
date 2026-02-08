@@ -18,11 +18,18 @@ class ProblemInputs:
 
 
 @dataclass(frozen=True)
+class CriticPerspective:
+    name: str
+    description: str
+
+
+@dataclass(frozen=True)
 class CriticIssue:
     severity: Severity
     location: str
     reason: str
     required_fix: str
+    suggestion: str
 
     def to_dict(self) -> dict[str, str]:
         return {
@@ -30,20 +37,49 @@ class CriticIssue:
             "location": self.location,
             "reason": self.reason,
             "required_fix": self.required_fix,
+            "suggestion": self.suggestion,
         }
 
 
 @dataclass(frozen=True)
 class CriticResult:
+    critic_name: str
     verdict: Verdict
     issues: list[CriticIssue]
     residual_concerns: list[str]
 
     def to_dict(self) -> dict[str, object]:
         return {
+            "critic_name": self.critic_name,
             "verdict": self.verdict,
             "issues": [issue.to_dict() for issue in self.issues],
             "residual_concerns": self.residual_concerns,
+        }
+
+
+@dataclass(frozen=True)
+class CouncilResult:
+    """Aggregated result from all critics in the council."""
+
+    verdicts: list[CriticResult]
+
+    @property
+    def overall_verdict(self) -> Verdict:
+        if all(cr.verdict == "PASS" for cr in self.verdicts):
+            return "PASS"
+        return "FAIL"
+
+    @property
+    def all_issues(self) -> list[CriticIssue]:
+        issues: list[CriticIssue] = []
+        for cr in self.verdicts:
+            issues.extend(cr.issues)
+        return issues
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "overall_verdict": self.overall_verdict,
+            "critics": [cr.to_dict() for cr in self.verdicts],
         }
 
 
@@ -53,8 +89,8 @@ class LoopRecord:
     statement_text: str
     sketch_text: str
     prover_text: str
-    critic_text: str
-    critic_result: CriticResult
+    critic_texts: dict[str, str]
+    council_result: CouncilResult
 
 
 @dataclass(frozen=True)
@@ -69,6 +105,7 @@ class PipelineRunResult:
     loops: list[LoopRecord]
     transcript_path: Path
     meta_path: Path
+    latex_path: Path
 
     def to_meta_dict(self) -> dict[str, object]:
         return {
@@ -81,10 +118,11 @@ class PipelineRunResult:
             "issue_counts": self.issue_counts,
             "transcript_path": str(self.transcript_path),
             "meta_path": str(self.meta_path),
+            "latex_path": str(self.latex_path),
             "loops": [
                 {
                     "loop_index": loop.loop_index,
-                    "critic_result": loop.critic_result.to_dict(),
+                    "council_result": loop.council_result.to_dict(),
                 }
                 for loop in self.loops
             ],

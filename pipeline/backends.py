@@ -76,6 +76,7 @@ class DemoBackend:
             )
 
         if role == "critic":
+            perspective = context.get("critic_perspective_name", "General")
             if loop_index == 1:
                 payload = {
                     "verdict": "FAIL",
@@ -85,6 +86,10 @@ class DemoBackend:
                             "location": "Complete Proof",
                             "reason": "The proof outline lacks an explicit justification for Lemma B.",
                             "required_fix": "Provide a stepwise derivation for Lemma B from assumptions or prior lemmas.",
+                            "suggestion": (
+                                "Consider breaking Lemma B into sub-claims and "
+                                "proving each from the stated assumptions."
+                            ),
                         }
                     ],
                     "residual_concerns": [
@@ -92,7 +97,7 @@ class DemoBackend:
                     ],
                 }
                 return (
-                    "## Verdict\n"
+                    f"## {perspective} Critic — Verdict\n"
                     "FAIL\n\n"
                     "## Issues\n"
                     "1. [major] Complete Proof: missing detailed derivation for Lemma B.\n\n"
@@ -102,7 +107,7 @@ class DemoBackend:
 
             payload = {"verdict": "PASS", "issues": [], "residual_concerns": []}
             return (
-                "## Verdict\n"
+                f"## {perspective} Critic — Verdict\n"
                 "PASS\n\n"
                 "## Issues\n"
                 "None.\n\n"

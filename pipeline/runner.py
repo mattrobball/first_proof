@@ -9,6 +9,7 @@ from .backends import AgentBackend, build_backend
 from .config import PipelineConfig
 from .io import (
     InputValidationError,
+    build_latex,
     build_transcript,
     ensure_output_dir,
     format_timestamp,
@@ -17,24 +18,38 @@ from .io import (
     write_meta,
     write_text,
 )
-from .models import CriticIssue, LoopRecord, PipelineRunResult
+from .models import CouncilResult, CriticIssue, CriticResult, LoopRecord, PipelineRunResult
 from .validate import OutputValidationError, ensure_required_sections, parse_critic_output
 
 
-def _issues_to_markdown(issues: list[CriticIssue]) -> str:
+def _issues_to_markdown(issues: list[CriticIssue], critics: list[CriticResult] | None = None) -> str:
+    if critics is not None:
+        lines = []
+        idx = 0
+        for cr in critics:
+            for issue in cr.issues:
+                idx += 1
+                lines.append(
+                    f"{idx}. [{issue.severity}] ({cr.critic_name}) {issue.location}: "
+                    f"{issue.reason} (required fix: {issue.required_fix}) "
+                    f"[suggestion: {issue.suggestion}]"
+                )
+        return "\n".join(lines) if lines else "None."
+
     if not issues:
         return "None."
     lines = []
     for idx, issue in enumerate(issues, start=1):
         lines.append(
             f"{idx}. [{issue.severity}] {issue.location}: {issue.reason} "
-            f"(required fix: {issue.required_fix})"
+            f"(required fix: {issue.required_fix}) "
+            f"[suggestion: {issue.suggestion}]"
         )
     return "\n".join(lines)
 
 
 def _format_loop_for_context(loop: LoopRecord) -> str:
-    return (
+    parts = [
         f"## Loop {loop.loop_index}\n"
         "### Statement\n"
         f"{loop.statement_text.strip()}\n"
@@ -42,9 +57,10 @@ def _format_loop_for_context(loop: LoopRecord) -> str:
         f"{loop.sketch_text.strip()}\n"
         "### Prover\n"
         f"{loop.prover_text.strip()}\n"
-        "### Critic\n"
-        f"{loop.critic_text.strip()}\n"
-    )
+    ]
+    for critic_name, critic_text in loop.critic_texts.items():
+        parts.append(f"### Critic — {critic_name}\n{critic_text.strip()}\n")
+    return "".join(parts)
 
 
 def _build_context(
@@ -56,6 +72,7 @@ def _build_context(
     max_loops: int,
     prior_transcript: str,
     critic_issues: list[CriticIssue],
+    council_critics: list[CriticResult] | None = None,
 ) -> dict[str, str]:
     return {
         "problem_id": problem_id,
@@ -65,14 +82,14 @@ def _build_context(
         "loop_index": str(loop_index),
         "max_loops": str(max_loops),
         "prior_transcript": prior_transcript.strip() or "None.",
-        "critic_issues_markdown": _issues_to_markdown(critic_issues),
+        "critic_issues_markdown": _issues_to_markdown(critic_issues, council_critics),
     }
 
 
 def _aggregate_issue_counts(loops: list[LoopRecord]) -> dict[str, int]:
     counts: dict[str, int] = {"critical": 0, "major": 0, "minor": 0}
     for loop in loops:
-        for issue in loop.critic_result.issues:
+        for issue in loop.council_result.all_issues:
             counts[issue.severity] += 1
     return counts
 
@@ -90,6 +107,7 @@ def run_pipeline(
     loops: list[LoopRecord] = []
     prior_transcript = ""
     critic_issues: list[CriticIssue] = []
+    council_critics: list[CriticResult] | None = None
 
     for loop_index in range(1, config.max_loops + 1):
         base_context = _build_context(
@@ -101,6 +119,7 @@ def run_pipeline(
             max_loops=config.max_loops,
             prior_transcript=prior_transcript,
             critic_issues=critic_issues,
+            council_critics=council_critics,
         )
 
         statement_prompt = render_prompt("statement", base_context)
@@ -119,26 +138,39 @@ def run_pipeline(
         prover_text = backend.generate("prover", prover_prompt, prover_context)
         ensure_required_sections("prover", prover_text)
 
-        critic_context = dict(prover_context)
-        critic_context["prover_output"] = prover_text
-        critic_prompt = render_prompt("critic", critic_context)
-        critic_text = backend.generate("critic", critic_prompt, critic_context)
-        critic_result = parse_critic_output(critic_text)
+        critic_base_context = dict(prover_context)
+        critic_base_context["prover_output"] = prover_text
+
+        critic_results: list[CriticResult] = []
+        critic_texts: dict[str, str] = {}
+
+        for perspective in config.critic_perspectives:
+            critic_context = dict(critic_base_context)
+            critic_context["critic_perspective_name"] = perspective.name
+            critic_context["critic_perspective_description"] = perspective.description
+            critic_prompt = render_prompt("critic", critic_context)
+            critic_text = backend.generate("critic", critic_prompt, critic_context)
+            critic_result = parse_critic_output(critic_text, critic_name=perspective.name)
+            critic_results.append(critic_result)
+            critic_texts[perspective.name] = critic_text
+
+        council = CouncilResult(verdicts=critic_results)
 
         loop = LoopRecord(
             loop_index=loop_index,
             statement_text=statement_text,
             sketch_text=sketch_text,
             prover_text=prover_text,
-            critic_text=critic_text,
-            critic_result=critic_result,
+            critic_texts=critic_texts,
+            council_result=council,
         )
         loops.append(loop)
         prior_transcript += "\n" + _format_loop_for_context(loop)
 
-        if critic_result.verdict == "PASS":
+        if council.overall_verdict == "PASS":
             break
-        critic_issues = critic_result.issues
+        critic_issues = council.all_issues
+        council_critics = critic_results
 
     finished_dt = utc_now()
     finished_at = finished_dt.isoformat()
@@ -146,8 +178,9 @@ def run_pipeline(
     out_dir = ensure_output_dir(problem_dir, config.out_dir_name)
     transcript_path = out_dir / f"{timestamp}-transcript.md"
     meta_path = out_dir / f"{timestamp}-meta.json"
+    latex_path = out_dir / f"{timestamp}-report.tex"
 
-    final_verdict = loops[-1].critic_result.verdict
+    final_verdict = loops[-1].council_result.overall_verdict
     issue_counts = _aggregate_issue_counts(loops)
     run_result = PipelineRunResult(
         problem_id=problem_inputs.problem_id,
@@ -160,6 +193,7 @@ def run_pipeline(
         loops=loops,
         transcript_path=transcript_path,
         meta_path=meta_path,
+        latex_path=latex_path,
     )
 
     transcript_text = build_transcript(
@@ -171,6 +205,17 @@ def run_pipeline(
         final_verdict=final_verdict,
     )
     write_text(transcript_path, transcript_text)
+
+    latex_text = build_latex(
+        problem_inputs=problem_inputs,
+        config=config,
+        loops=loops,
+        started_at=started_at,
+        finished_at=finished_at,
+        final_verdict=final_verdict,
+    )
+    write_text(latex_path, latex_text)
+
     write_meta(
         meta_path,
         run_result=run_result,
@@ -267,6 +312,8 @@ def main(argv: list[str] | None = None) -> int:
         dry_context["statement_output"] = "<dry-run statement output placeholder>"
         dry_context["sketch_output"] = "<dry-run sketch output placeholder>"
         dry_context["prover_output"] = "<dry-run prover output placeholder>"
+        dry_context["critic_perspective_name"] = "<dry-run perspective>"
+        dry_context["critic_perspective_description"] = "<dry-run description>"
         try:
             for role in ("statement", "sketch", "prover", "critic"):
                 _ = render_prompt(role, dry_context)
@@ -295,6 +342,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[ok] Loops: {result.executed_loops}/{result.max_loops}")
     print(f"[ok] Verdict: {result.final_verdict}")
     print(f"[ok] Transcript: {result.transcript_path}")
+    print(f"[ok] LaTeX: {result.latex_path}")
     print(f"[ok] Meta: {result.meta_path}")
     if result.final_verdict == "PASS":
         return 0

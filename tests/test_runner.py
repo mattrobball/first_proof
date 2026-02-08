@@ -81,7 +81,8 @@ FAIL
       "severity": "major",
       "location": "Complete Proof",
       "reason": "Missing justification.",
-      "required_fix": "Add details."
+      "required_fix": "Add details.",
+      "suggestion": "Break the argument into smaller steps."
     }
   ],
   "residual_concerns": []
@@ -133,6 +134,7 @@ def test_stops_early_on_pass(tmp_path: Path) -> None:
     assert result.executed_loops == 1
     assert result.transcript_path.exists()
     assert result.meta_path.exists()
+    assert result.latex_path.exists()
 
 
 def test_stops_at_max_loops_on_fail(tmp_path: Path) -> None:
@@ -153,8 +155,63 @@ def test_transcript_and_meta_content(tmp_path: Path) -> None:
     assert "# Proof Pipeline Transcript" in transcript
     assert "## Loop 1" in transcript
     assert "Pipeline finished with verdict: `PASS`." in transcript
+    assert "Critic Council" in transcript
 
     meta = json.loads(result.meta_path.read_text(encoding="utf-8"))
     assert meta["problem_id"] == "5"
     assert meta["final_verdict"] == "PASS"
     assert "input_hashes" in meta
+
+
+def test_council_result_in_meta(tmp_path: Path) -> None:
+    problem_dir = _prepare_problem_dir(tmp_path)
+    config = PipelineConfig(max_loops=2, out_dir_name="runs")
+    result = run_pipeline(problem_dir, config, AlwaysPassBackend())
+
+    meta = json.loads(result.meta_path.read_text(encoding="utf-8"))
+    loop_meta = meta["loops"][0]
+    council = loop_meta["council_result"]
+    assert council["overall_verdict"] == "PASS"
+    assert isinstance(council["critics"], list)
+    assert len(council["critics"]) == 3  # default 3 perspectives
+
+
+def test_multi_critic_all_must_pass(tmp_path: Path) -> None:
+    """If any critic returns FAIL, the council verdict is FAIL."""
+    problem_dir = _prepare_problem_dir(tmp_path)
+    config = PipelineConfig(max_loops=1, out_dir_name="runs")
+    result = run_pipeline(problem_dir, config, AlwaysFailBackend())
+
+    assert result.final_verdict == "FAIL"
+    council = result.loops[0].council_result
+    assert council.overall_verdict == "FAIL"
+    # Each of the 3 default critics should have issues
+    for cr in council.verdicts:
+        assert cr.verdict == "FAIL"
+        assert len(cr.issues) > 0
+        for issue in cr.issues:
+            assert issue.suggestion  # suggestion must be present
+
+
+def test_latex_output_generated(tmp_path: Path) -> None:
+    problem_dir = _prepare_problem_dir(tmp_path)
+    config = PipelineConfig(max_loops=2, out_dir_name="runs")
+    result = run_pipeline(problem_dir, config, AlwaysPassBackend())
+
+    assert result.latex_path.exists()
+    latex = result.latex_path.read_text(encoding="utf-8")
+    assert r"\documentclass" in latex
+    assert r"\begin{document}" in latex
+    assert r"\end{document}" in latex
+    assert "Proof Pipeline Report" in latex
+    assert "Critic Council Feedback" in latex
+
+
+def test_latex_contains_suggestions_on_fail(tmp_path: Path) -> None:
+    problem_dir = _prepare_problem_dir(tmp_path)
+    config = PipelineConfig(max_loops=1, out_dir_name="runs")
+    result = run_pipeline(problem_dir, config, AlwaysFailBackend())
+
+    latex = result.latex_path.read_text(encoding="utf-8")
+    assert "Suggestion" in latex
+    assert "Required fix" in latex
