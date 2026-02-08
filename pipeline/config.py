@@ -41,6 +41,7 @@ class PipelineConfig:
     backend: str = "codex"
     model: str | None = None
     seed: int | None = None
+    config_path: str | None = None
     critic_perspectives: tuple[CriticPerspective, ...] = tuple(DEFAULT_CRITIC_PERSPECTIVES)
 
     def validate(self) -> None:

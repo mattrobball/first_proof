@@ -1,3 +1,10 @@
+"""Backend protocol, demo backend, routing, and factory functions.
+
+The :class:`AgentBackend` protocol is the central interface for all backends.
+:class:`BackendRouter` maps each agent *role* to its own backend instance,
+allowing per-agent model selection driven by a TOML configuration file.
+"""
+
 from __future__ import annotations
 
 import json
@@ -9,11 +16,42 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from .agent_config import AgentModelConfig, PipelineFileConfig
+from .api_backends import build_api_backend
+from .cli_backends import build_cli_backend
+
+
+# ---------------------------------------------------------------------------
+# Protocol
+# ---------------------------------------------------------------------------
 
 class AgentBackend(Protocol):
     def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
         ...
 
+
+# ---------------------------------------------------------------------------
+# BackendRouter – dispatches per-role
+# ---------------------------------------------------------------------------
+
+@dataclass
+class BackendRouter:
+    """Routes each agent role to its own backend instance.
+
+    Implements :class:`AgentBackend` so the runner can use it transparently.
+    """
+
+    role_backends: dict[str, AgentBackend]
+    default_backend: AgentBackend
+
+    def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
+        backend = self.role_backends.get(role, self.default_backend)
+        return backend.generate(role, prompt, context)
+
+
+# ---------------------------------------------------------------------------
+# DemoBackend (deterministic, for tests)
+# ---------------------------------------------------------------------------
 
 def _first_non_empty_line(text: str) -> str:
     for line in text.splitlines():
@@ -118,9 +156,18 @@ class DemoBackend:
         raise ValueError(f"Unsupported role for backend output: {role}")
 
 
+# ---------------------------------------------------------------------------
+# Legacy CodexCLIBackend (kept for backward-compatible --backend=codex path)
+# ---------------------------------------------------------------------------
+
 @dataclass
 class CodexCLIBackend:
-    """Runs one local `codex exec` process per agent turn."""
+    """Runs one local ``codex exec`` process per agent turn.
+
+    This class is retained for backward compatibility with the ``--backend
+    codex`` CLI flag.  New deployments should prefer a ``pipeline.toml`` config
+    file with ``backend = "cli"`` and ``provider = "codex"``.
+    """
 
     model: str | None = None
     codex_bin: str = "codex"
@@ -244,17 +291,35 @@ class CodexCLIBackend:
         return self._run_codex(role, prompt, self.target_reasoning_effort)
 
 
-@dataclass
-class OpenAIBackendCompatibilityStub:
-    """Legacy placeholder kept only to provide a direct migration error."""
+# ---------------------------------------------------------------------------
+# Factory functions
+# ---------------------------------------------------------------------------
 
-    model: str | None = None
+def _build_single_backend(cfg: AgentModelConfig, workdir: Path | None = None) -> AgentBackend:
+    """Create one backend from an :class:`AgentModelConfig`."""
+    kind = cfg.backend.lower()
+    if kind == "demo":
+        return DemoBackend()
+    if kind == "api":
+        return build_api_backend(cfg)
+    if kind == "cli":
+        return build_cli_backend(cfg, workdir=workdir)
+    raise ValueError(f"Unsupported backend type: '{cfg.backend}'")
 
-    def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
-        raise RuntimeError(
-            "backend=openai has been removed. Use backend=codex "
-            "to spawn local Codex agents."
-        )
+
+def build_backend_from_config(
+    file_config: PipelineFileConfig, workdir: Path | None = None
+) -> BackendRouter:
+    """Create a :class:`BackendRouter` from a parsed TOML config.
+
+    Each agent role defined in ``[agents.<role>]`` gets its own backend; all
+    other roles fall back to ``[defaults]``.
+    """
+    default_backend = _build_single_backend(file_config.defaults, workdir)
+    role_backends: dict[str, AgentBackend] = {}
+    for role, cfg in file_config.agents.items():
+        role_backends[role] = _build_single_backend(cfg, workdir)
+    return BackendRouter(role_backends=role_backends, default_backend=default_backend)
 
 
 def build_backend(
@@ -263,14 +328,16 @@ def build_backend(
     seed: int | None = None,
     workdir: Path | None = None,
 ) -> AgentBackend:
+    """Legacy factory used by the ``--backend`` CLI flag.
+
+    Retained for backward compatibility.  Prefer ``build_backend_from_config``
+    for new code.
+    """
     normalized = name.strip().lower()
     if normalized == "demo":
         return DemoBackend()
     if normalized in {"codex", "codex-cli"}:
         if seed is not None:
-            # Codex CLI does not currently expose a stable seed flag.
             _ = seed
         return CodexCLIBackend(model=model, workdir=workdir)
-    if normalized == "openai":
-        return OpenAIBackendCompatibilityStub(model=model)
-    raise ValueError(f"Unsupported backend: {name}")
+    raise ValueError(f"Unsupported legacy backend: {name}")
