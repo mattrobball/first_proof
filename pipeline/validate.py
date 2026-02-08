@@ -46,7 +46,7 @@ def ensure_required_sections(role: str, text: str) -> None:
         )
 
 
-def parse_critic_output(text: str) -> CriticResult:
+def parse_critic_output(text: str, critic_name: str = "") -> CriticResult:
     match = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
     if not match:
         raise OutputValidationError("Critic output missing fenced JSON payload")
@@ -77,6 +77,7 @@ def parse_critic_output(text: str) -> CriticResult:
         location = issue_obj.get("location")
         reason = issue_obj.get("reason")
         required_fix = issue_obj.get("required_fix")
+        suggestion = issue_obj.get("suggestion")
 
         if severity not in VALID_SEVERITIES:
             raise OutputValidationError(
@@ -90,6 +91,10 @@ def parse_critic_output(text: str) -> CriticResult:
             raise OutputValidationError(
                 f"Critic issue #{idx} required_fix must be non-empty"
             )
+        if not isinstance(suggestion, str) or not suggestion.strip():
+            raise OutputValidationError(
+                f"Critic issue #{idx} suggestion must be non-empty"
+            )
 
         typed_severity: Severity = severity
         issues.append(
@@ -98,6 +103,7 @@ def parse_critic_output(text: str) -> CriticResult:
                 location=location.strip(),
                 reason=reason.strip(),
                 required_fix=required_fix.strip(),
+                suggestion=suggestion.strip(),
             )
         )
 
@@ -107,4 +113,9 @@ def parse_critic_output(text: str) -> CriticResult:
     if typed_verdict == "FAIL" and not issues:
         raise OutputValidationError("Critic cannot return FAIL with empty issues")
 
-    return CriticResult(verdict=typed_verdict, issues=issues, residual_concerns=residual)
+    return CriticResult(
+        critic_name=critic_name,
+        verdict=typed_verdict,
+        issues=issues,
+        residual_concerns=residual,
+    )
