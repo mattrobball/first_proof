@@ -4,8 +4,9 @@ import argparse
 import sys
 from pathlib import Path
 
+from .agent_config import find_config_file, load_config_file
 from .agents import render_prompt
-from .backends import AgentBackend, build_backend
+from .backends import AgentBackend, build_backend, build_backend_from_config
 from .config import PipelineConfig
 from .io import (
     InputValidationError,
@@ -249,18 +250,27 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         "--backend",
         default="codex",
         choices=["codex", "demo"],
-        help="Agent backend implementation.",
+        help="Agent backend (legacy single-backend mode). Ignored when --config is set.",
     )
     parser.add_argument(
         "--model",
         default=None,
-        help="Optional model name when backend=codex. If omitted, Codex CLI profile defaults are used.",
+        help="Model name for legacy --backend mode. Ignored when --config is set.",
     )
     parser.add_argument(
         "--seed",
         type=int,
         default=None,
         help="Optional deterministic seed for compatible backends.",
+    )
+    parser.add_argument(
+        "--config",
+        default=None,
+        help=(
+            "Path to a pipeline.toml config file for per-agent backend/model "
+            "selection. If omitted, searches for pipeline.toml in the problem "
+            "directory and current working directory."
+        ),
     )
     parser.add_argument(
         "--dry-run",
@@ -277,6 +287,25 @@ def _resolve_problem_dir(problem: str) -> Path:
     return Path.cwd() / problem
 
 
+def _resolve_backend(
+    config: PipelineConfig, problem_dir: Path
+) -> AgentBackend:
+    """Build the appropriate backend: config-file router or legacy single."""
+    config_file = find_config_file(
+        explicit=config.config_path,
+        search_dirs=[problem_dir, Path.cwd()],
+    )
+    if config_file is not None:
+        file_config = load_config_file(config_file)
+        print(f"[info] Using config: {config_file}", file=sys.stderr)
+        return build_backend_from_config(file_config, workdir=Path.cwd())
+
+    # Fall back to legacy single-backend mode
+    return build_backend(
+        config.backend, config.model, config.seed, workdir=Path.cwd()
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_argument_parser()
     args = parser.parse_args(argv)
@@ -288,6 +317,7 @@ def main(argv: list[str] | None = None) -> int:
         backend=args.backend,
         model=args.model,
         seed=args.seed,
+        config_path=args.config,
     )
 
     problem_dir = _resolve_problem_dir(args.problem)
@@ -327,12 +357,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     try:
-        backend = build_backend(
-            config.backend,
-            config.model,
-            config.seed,
-            workdir=Path.cwd(),
-        )
+        backend = _resolve_backend(config, problem_dir)
         result = run_pipeline(problem_dir=problem_dir, config=config, backend=backend)
     except (OutputValidationError, ValueError, RuntimeError, InputValidationError) as exc:
         print(f"[error] {exc}", file=sys.stderr)

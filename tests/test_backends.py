@@ -5,13 +5,77 @@ from types import SimpleNamespace
 
 import pytest
 
-from pipeline.backends import CodexCLIBackend, build_backend
+from pipeline.agent_config import AgentModelConfig, PipelineFileConfig
+from pipeline.backends import (
+    BackendRouter,
+    CodexCLIBackend,
+    DemoBackend,
+    _build_single_backend,
+    build_backend,
+    build_backend_from_config,
+)
 
 
-def test_build_backend_openai_raises_migration_error() -> None:
-    backend = build_backend("openai", model="gpt-5")
-    with pytest.raises(RuntimeError, match="removed"):
-        backend.generate("statement", "prompt", {})
+# ---------------------------------------------------------------------------
+# Legacy build_backend
+# ---------------------------------------------------------------------------
+
+
+def test_build_backend_unknown_raises() -> None:
+    with pytest.raises(ValueError, match="Unsupported legacy backend"):
+        build_backend("openai", model="gpt-5")
+
+
+# ---------------------------------------------------------------------------
+# BackendRouter
+# ---------------------------------------------------------------------------
+
+
+def test_backend_router_dispatches_by_role() -> None:
+    """BackendRouter should dispatch to role-specific backends when defined."""
+
+    class _FakeBackend:
+        def __init__(self, tag: str) -> None:
+            self.tag = tag
+
+        def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
+            return f"{self.tag}:{role}"
+
+    default = _FakeBackend("default")
+    prover = _FakeBackend("prover-backend")
+    router = BackendRouter(
+        role_backends={"prover": prover},
+        default_backend=default,
+    )
+    assert router.generate("prover", "", {}) == "prover-backend:prover"
+    assert router.generate("statement", "", {}) == "default:statement"
+    assert router.generate("critic", "", {}) == "default:critic"
+
+
+def test_build_single_backend_demo() -> None:
+    cfg = AgentModelConfig(backend="demo")
+    backend = _build_single_backend(cfg)
+    assert isinstance(backend, DemoBackend)
+
+
+def test_build_single_backend_unknown_raises() -> None:
+    cfg = AgentModelConfig(backend="nonexistent")
+    with pytest.raises(ValueError, match="Unsupported backend type"):
+        _build_single_backend(cfg)
+
+
+def test_build_backend_from_config_creates_router() -> None:
+    defaults = AgentModelConfig(backend="demo")
+    agents = {"prover": AgentModelConfig(backend="demo")}
+    fc = PipelineFileConfig(defaults=defaults, agents=agents)
+    router = build_backend_from_config(fc)
+    assert isinstance(router, BackendRouter)
+    assert "prover" in router.role_backends
+
+
+# ---------------------------------------------------------------------------
+# Legacy CodexCLIBackend
+# ---------------------------------------------------------------------------
 
 
 def test_codex_backend_invokes_codex_exec(monkeypatch: pytest.MonkeyPatch) -> None:
