@@ -157,6 +157,15 @@ def gemini_list_models(api_key: str) -> list[str]:
     return [m["name"] for m in data.get("models", [])]
 
 
+_GEMINI_THINKING_LEVEL_MAP: dict[str, str] = {
+    "minimal": "LOW",
+    "low": "LOW",
+    "medium": "MEDIUM",
+    "high": "HIGH",
+    "xhigh": "HIGH",
+}
+
+
 @dataclass
 class GeminiBackend:
     """Calls the Google Generative Language API (Gemini)."""
@@ -182,9 +191,11 @@ class GeminiBackend:
         if self.cfg.temperature is not None:
             gen_cfg["temperature"] = self.cfg.temperature
         if self.cfg.reasoning_effort:
-            gen_cfg["thinkingConfig"] = {
-                "thinkingLevel": self.cfg.reasoning_effort,
-            }
+            gemini_level = _GEMINI_THINKING_LEVEL_MAP.get(
+                self.cfg.reasoning_effort.lower(),
+                self.cfg.reasoning_effort.upper(),
+            )
+            gen_cfg["thinkingConfig"] = {"thinkingLevel": gemini_level}
 
         resp = _post_json(url, headers, body, self.cfg.timeout)
 
