@@ -156,6 +156,36 @@ def test_randomize_seed_deterministic() -> None:
     assert a1 == a2
 
 
+def test_shuffle_changes_assignments_each_call() -> None:
+    """Calling shuffle() multiple times produces varying assignments."""
+    defaults = AgentModelConfig(backend="demo")
+    pool = {
+        "backend_a": AgentModelConfig(backend="demo"),
+        "backend_b": AgentModelConfig(backend="demo"),
+        "backend_c": AgentModelConfig(backend="demo"),
+    }
+    fc = PipelineFileConfig(
+        defaults=defaults, agents={}, reviewer_pool=pool,
+        randomize_agents=True,
+    )
+    router, first = build_backend_from_config(fc, seed=7)
+    second = router.shuffle()
+    third = router.shuffle()
+    # With 3 pool entries and 5 roles, at least one call should differ
+    assert not (first == second == third), (
+        "Expected at least one shuffle to produce different assignments"
+    )
+
+
+def test_shuffle_noop_when_not_randomizing() -> None:
+    """shuffle() returns empty dict when randomization is off."""
+    defaults = AgentModelConfig(backend="demo")
+    pool = {"reviewer_a": AgentModelConfig(backend="demo")}
+    fc = PipelineFileConfig(defaults=defaults, agents={}, reviewer_pool=pool)
+    router, _ = build_backend_from_config(fc)
+    assert router.shuffle() == {}
+
+
 def test_randomize_respects_explicit_agents() -> None:
     """Roles with explicit [agents.<role>] overrides are not randomized."""
     defaults = AgentModelConfig(backend="demo")

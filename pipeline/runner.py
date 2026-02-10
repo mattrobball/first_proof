@@ -189,6 +189,14 @@ def _status(msg: str) -> None:
     print(f"  {msg}", file=sys.stderr, flush=True)
 
 
+def _log_shuffle(assignments: dict[str, str], phase: str) -> None:
+    """Log role assignments after a shuffle (no-op when empty)."""
+    if not assignments:
+        return
+    pairs = ", ".join(f"{r}->{p}" for r, p in sorted(assignments.items()))
+    _status(f"[{phase}] shuffled: {pairs}")
+
+
 def run_pipeline(
     problem_dir: Path,
     config: PipelineConfig,
@@ -214,6 +222,7 @@ def run_pipeline(
     persp_desc = _build_perspectives_description(perspective_pairs)
 
     # --- Researcher (once, pre-loop) ---
+    _log_shuffle(backend.shuffle(), "researcher")
     _status("researcher ...")
     researcher_context = {
         "problem_id": problem_inputs.problem_id,
@@ -227,6 +236,7 @@ def run_pipeline(
     _status("researcher done")
 
     for loop_index in range(1, config.max_loops + 1):
+        _log_shuffle(backend.shuffle(), f"loop {loop_index}")
         base_context = _build_context(
             problem_id=problem_inputs.problem_id,
             question_text=problem_inputs.question_text,
@@ -547,14 +557,16 @@ def _resolve_backend(
         file_config = load_config_file(config_file)
         validate_approved_backends(file_config)
         print(f"[info] Using config: {config_file}", file=sys.stderr)
-        router, assignments = build_backend_from_config(
+        router, _initial = build_backend_from_config(
             file_config, workdir=Path.cwd(), seed=config.seed,
         )
-        for role, pool_name in sorted(assignments.items()):
-            cfg = file_config.reviewer_pool.get(pool_name, file_config.defaults)
+        if file_config.randomize_agents:
+            eligible = sorted(
+                pn for pn, cfg in file_config.reviewer_pool.items()
+                if cfg.backend.lower() not in ("self_citer", "extension_requester")
+            )
             print(
-                f"[info] {role} -> {pool_name} "
-                f"({cfg.backend}/{cfg.provider}/{cfg.model})",
+                f"[info] randomize_agents enabled, pool: {', '.join(eligible)}",
                 file=sys.stderr,
             )
         return router
