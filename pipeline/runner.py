@@ -4,6 +4,7 @@ import argparse
 import os
 import re
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from .agent_config import find_config_file, load_config_file, validate_approved_backends
@@ -218,21 +219,22 @@ def run_pipeline(
             dispatch_text, perspective_names, pool_names
         )
 
-        # --- Reviewers (one per perspective) ---
-        reviewer_results: list[ReviewerResult] = []
-        reviewer_texts: dict[str, str] = {}
+        # --- Reviewers (one per perspective, parallel) ---
         num_perspectives = len(config.reviewer_perspectives)
-        for persp_idx, persp in enumerate(config.reviewer_perspectives, 1):
-            assigned_pool = editor_dispatch.assignments[persp.name]
+
+        def _run_single_reviewer(
+            persp_idx: int, persp_name: str, persp_description: str,
+            assigned_pool: str,
+        ) -> tuple[str, str, ReviewerResult]:
             _status(
                 f"[loop {loop_index}/{config.max_loops}] "
                 f"reviewer {persp_idx}/{num_perspectives} "
-                f"({assigned_pool} -> {persp.name}) ..."
+                f"({assigned_pool} -> {persp_name}) ..."
             )
             reviewer_context = dict(dispatch_context)
             reviewer_context["reviewer_name"] = assigned_pool
-            reviewer_context["perspective_name"] = persp.name
-            reviewer_context["perspective_description"] = persp.description
+            reviewer_context["perspective_name"] = persp_name
+            reviewer_context["perspective_description"] = persp_description
             reviewer_prompt = render_prompt("reviewer", reviewer_context)
             reviewer_text = backend.generate_with_pool(
                 assigned_pool, "reviewer", reviewer_prompt, reviewer_context
@@ -240,10 +242,27 @@ def run_pipeline(
             reviewer_result = parse_reviewer_output(
                 reviewer_text,
                 reviewer_name=assigned_pool,
-                perspective_name=persp.name,
+                perspective_name=persp_name,
             )
-            reviewer_results.append(reviewer_result)
-            reviewer_texts[persp.name] = reviewer_text
+            return persp_name, reviewer_text, reviewer_result
+
+        with ThreadPoolExecutor(max_workers=num_perspectives) as executor:
+            futures = [
+                executor.submit(
+                    _run_single_reviewer,
+                    persp_idx,
+                    persp.name,
+                    persp.description,
+                    editor_dispatch.assignments[persp.name],
+                )
+                for persp_idx, persp in enumerate(config.reviewer_perspectives, 1)
+            ]
+            reviewer_results: list[ReviewerResult] = []
+            reviewer_texts: dict[str, str] = {}
+            for future in futures:
+                persp_name, reviewer_text, reviewer_result = future.result()
+                reviewer_texts[persp_name] = reviewer_text
+                reviewer_results.append(reviewer_result)
 
         # --- Editor decision ---
         _status(f"[loop {loop_index}/{config.max_loops}] editor decision ...")
