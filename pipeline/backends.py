@@ -3,7 +3,7 @@
 The :class:`AgentBackend` protocol is the central interface for all backends.
 :class:`BackendRouter` maps each agent *role* to its own backend instance,
 allowing per-agent model selection driven by a TOML configuration file.
-The router also holds a pool of reviewer backends that the editor can
+The router also holds a pool of agent backends that the editor can
 dispatch to individual perspectives.
 """
 
@@ -43,11 +43,17 @@ class BackendRouter:
 
     Implements :class:`AgentBackend` so the runner can use it transparently.
     Also holds ``pool_backends`` for reviewer dispatch.
+
+    When ``eligible_pool`` and ``rng`` are set, :meth:`shuffle` re-rolls
+    non-reviewer role assignments each time it is called.
     """
 
     role_backends: dict[str, AgentBackend]
     default_backend: AgentBackend
     pool_backends: dict[str, AgentBackend] = field(default_factory=dict)
+    eligible_pool: dict[str, AgentBackend] = field(default_factory=dict)
+    rng: random.Random | None = field(default=None)
+    fixed_roles: frozenset[str] = field(default=frozenset())
 
     def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
         backend = self.role_backends.get(role, self.default_backend)
@@ -64,6 +70,39 @@ class BackendRouter:
             )
         backend = self.pool_backends[pool_name]
         return backend.generate(role, prompt, context)
+
+    def pick_role(self, role: str) -> str | None:
+        """Randomly assign a single *role* from the eligible pool.
+
+        Returns the chosen pool name, or ``None`` when randomization is
+        not configured or the role has an explicit override.
+        """
+        if not self.rng or not self.eligible_pool:
+            return None
+        if role in self.fixed_roles:
+            return None
+        pool_names = sorted(self.eligible_pool)
+        chosen = self.rng.choice(pool_names)
+        self.role_backends[role] = self.eligible_pool[chosen]
+        return chosen
+
+    def shuffle(self) -> dict[str, str]:
+        """Re-randomize non-reviewer role assignments.
+
+        Returns a ``role -> pool_name`` mapping for the new assignments.
+        No-op (returns empty dict) when randomization is not configured.
+        """
+        if not self.rng or not self.eligible_pool:
+            return {}
+        pool_names = sorted(self.eligible_pool)
+        assignments: dict[str, str] = {}
+        for role in _NON_REVIEWER_ROLES:
+            if role in self.fixed_roles:
+                continue
+            chosen = self.rng.choice(pool_names)
+            assignments[role] = chosen
+            self.role_backends[role] = self.eligible_pool[chosen]
+        return assignments
 
 
 # ---------------------------------------------------------------------------
@@ -390,12 +429,12 @@ def build_backend_from_config(
     """Create a :class:`BackendRouter` from a parsed TOML config.
 
     Each agent role defined in ``[agents.<role>]`` gets its own backend; all
-    other roles fall back to ``[defaults]``.  Reviewer pool entries become
+    other roles fall back to ``[defaults]``.  Agent pool entries become
     ``pool_backends``.
 
     When ``file_config.randomize_agents`` is True, non-reviewer roles without
     an explicit ``[agents.<role>]`` override are randomly assigned a backend
-    from the combined pool (defaults + reviewer_pool entries).
+    from the agent pool entries.
 
     Returns ``(router, assignments)`` where *assignments* maps
     ``role -> pool_name`` for any randomly assigned roles (empty dict when
@@ -407,40 +446,34 @@ def build_backend_from_config(
         role_backends[role] = _build_single_backend(cfg, workdir)
 
     pool_backends: dict[str, AgentBackend] = {}
-    for pool_name, cfg in file_config.reviewer_pool.items():
+    for pool_name, cfg in file_config.agent_pool.items():
         pool_backends[pool_name] = _build_single_backend(cfg, workdir)
 
-    assignments: dict[str, str] = {}
+    eligible_pool: dict[str, AgentBackend] = {}
+    rng: random.Random | None = None
+    fixed_roles: frozenset[str] = frozenset()
 
     if file_config.randomize_agents:
-        # Build named pool: defaults + reviewer_pool entries
-        named_configs: dict[str, AgentModelConfig] = {
-            "defaults": file_config.defaults,
-            **file_config.reviewer_pool,
-        }
-        pool_names = sorted(named_configs)
+        # Draw only from agent_pool entries
+        eligible_pool = dict(pool_backends)
+        if not eligible_pool:
+            raise ValueError(
+                "randomize_agents is enabled but no eligible pool backends found"
+            )
         rng = random.Random(seed)
+        fixed_roles = frozenset(file_config.agents)
 
-        # Pre-build backends for each named config (reuse existing where possible)
-        named_backends: dict[str, AgentBackend] = {"defaults": default_backend}
-        for pn in file_config.reviewer_pool:
-            named_backends[pn] = pool_backends[pn]
-
-        for role in _NON_REVIEWER_ROLES:
-            if role in file_config.agents:
-                continue  # explicit override takes precedence
-            chosen = rng.choice(pool_names)
-            assignments[role] = chosen
-            role_backends[role] = named_backends[chosen]
-
-    return (
-        BackendRouter(
-            role_backends=role_backends,
-            default_backend=default_backend,
-            pool_backends=pool_backends,
-        ),
-        assignments,
+    router = BackendRouter(
+        role_backends=role_backends,
+        default_backend=default_backend,
+        pool_backends=pool_backends,
+        eligible_pool=eligible_pool,
+        rng=rng,
+        fixed_roles=fixed_roles,
     )
+    # Do an initial shuffle so the router is usable immediately
+    assignments = router.shuffle()
+    return router, assignments
 
 
 def build_backend(

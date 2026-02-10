@@ -10,7 +10,7 @@ Context:
 Proof to be reviewed:
 {prover_output}
 
-Available reviewer pool:
+Available agent pool:
 {pool_description}
 
 Perspectives requiring review:

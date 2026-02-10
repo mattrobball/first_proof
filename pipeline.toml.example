@@ -3,8 +3,8 @@
 # [defaults] provides fallback values for all agents.
 # [agents.<role>] overrides per agent role (statement, sketch, prover,
 #   editor_dispatch, editor_decision).
-# [reviewer_pool.<name>] defines named reviewer backends that the editor
-#   can assign to perspectives at dispatch time.
+# [agent_pool.<name>] defines named backends available for agent role
+#   assignment and reviewer dispatch.
 
 [defaults]
 backend  = "cli"
@@ -22,13 +22,13 @@ backend  = "api"
 provider = "anthropic"
 model    = "claude-sonnet-4-20250514"
 
-# Reviewer pool — the editor assigns these to perspectives
-[reviewer_pool.claude_reviewer]
+# Agent pool — used for role assignment and reviewer dispatch
+[agent_pool.claude_reviewer]
 backend  = "api"
 provider = "anthropic"
 model    = "claude-sonnet-4-20250514"
 
-[reviewer_pool.gpt_reviewer]
+[agent_pool.gpt_reviewer]
 backend  = "api"
 provider = "openai"
 model    = "gpt-4o"

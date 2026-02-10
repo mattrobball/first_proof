@@ -104,7 +104,7 @@ def test_build_backend_from_config_creates_router_with_pool() -> None:
     defaults = AgentModelConfig(backend="demo")
     agents = {"prover": AgentModelConfig(backend="demo")}
     pool = {"claude_reviewer": AgentModelConfig(backend="demo")}
-    fc = PipelineFileConfig(defaults=defaults, agents=agents, reviewer_pool=pool)
+    fc = PipelineFileConfig(defaults=defaults, agents=agents, agent_pool=pool)
     router, assignments = build_backend_from_config(fc)
     assert isinstance(router, BackendRouter)
     assert "prover" in router.role_backends
@@ -125,13 +125,14 @@ def test_randomize_assigns_all_roles() -> None:
         "reviewer_b": AgentModelConfig(backend="demo"),
     }
     fc = PipelineFileConfig(
-        defaults=defaults, agents={}, reviewer_pool=pool,
+        defaults=defaults, agents={}, agent_pool=pool,
         randomize_agents=True,
     )
     _router, assignments = build_backend_from_config(fc, seed=42)
     expected_roles = {"researcher", "mentor", "prover", "editor_dispatch", "editor_decision"}
     assert set(assignments) == expected_roles
-    valid_pool_names = {"defaults", "reviewer_a", "reviewer_b"}
+    # Only pool entries are eligible — "defaults" is never selected
+    valid_pool_names = {"reviewer_a", "reviewer_b"}
     for pool_name in assignments.values():
         assert pool_name in valid_pool_names
 
@@ -144,12 +145,42 @@ def test_randomize_seed_deterministic() -> None:
         "reviewer_b": AgentModelConfig(backend="demo"),
     }
     fc = PipelineFileConfig(
-        defaults=defaults, agents={}, reviewer_pool=pool,
+        defaults=defaults, agents={}, agent_pool=pool,
         randomize_agents=True,
     )
     _, a1 = build_backend_from_config(fc, seed=99)
     _, a2 = build_backend_from_config(fc, seed=99)
     assert a1 == a2
+
+
+def test_shuffle_changes_assignments_each_call() -> None:
+    """Calling shuffle() multiple times produces varying assignments."""
+    defaults = AgentModelConfig(backend="demo")
+    pool = {
+        "backend_a": AgentModelConfig(backend="demo"),
+        "backend_b": AgentModelConfig(backend="demo"),
+        "backend_c": AgentModelConfig(backend="demo"),
+    }
+    fc = PipelineFileConfig(
+        defaults=defaults, agents={}, agent_pool=pool,
+        randomize_agents=True,
+    )
+    router, first = build_backend_from_config(fc, seed=7)
+    second = router.shuffle()
+    third = router.shuffle()
+    # With 3 pool entries and 5 roles, at least one call should differ
+    assert not (first == second == third), (
+        "Expected at least one shuffle to produce different assignments"
+    )
+
+
+def test_shuffle_noop_when_not_randomizing() -> None:
+    """shuffle() returns empty dict when randomization is off."""
+    defaults = AgentModelConfig(backend="demo")
+    pool = {"reviewer_a": AgentModelConfig(backend="demo")}
+    fc = PipelineFileConfig(defaults=defaults, agents={}, agent_pool=pool)
+    router, _ = build_backend_from_config(fc)
+    assert router.shuffle() == {}
 
 
 def test_randomize_respects_explicit_agents() -> None:
@@ -158,7 +189,7 @@ def test_randomize_respects_explicit_agents() -> None:
     agents = {"prover": AgentModelConfig(backend="demo")}
     pool = {"reviewer_a": AgentModelConfig(backend="demo")}
     fc = PipelineFileConfig(
-        defaults=defaults, agents=agents, reviewer_pool=pool,
+        defaults=defaults, agents=agents, agent_pool=pool,
         randomize_agents=True,
     )
     router, assignments = build_backend_from_config(fc, seed=42)

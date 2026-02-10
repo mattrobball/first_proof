@@ -50,14 +50,14 @@ The loop repeats until the editor accepts or the loop budget (default 5) is exha
 - `pipeline/backends.py` — `AgentBackend` protocol, `BackendRouter` (routes per-agent + pool dispatch), `DemoBackend`
 - `pipeline/api_backends.py` — HTTP backends (Anthropic, OpenAI, Gemini) using only `urllib`
 - `pipeline/cli_backends.py` — CLI backends (Codex, Claude, generic stdin→stdout)
-- `pipeline/agent_config.py` — TOML config loading with cascading defaults + per-agent overrides + reviewer pool
+- `pipeline/agent_config.py` — TOML config loading with cascading defaults + per-agent overrides + agent pool
 - `pipeline/agents.py` — Prompt template loading/rendering from `prompts/` directory
 - `pipeline/validate.py` — Output section validation, reviewer/editor JSON parsing
 - `pipeline/io.py` — Problem input loading, transcript/LaTeX/meta file generation
 
 ### Backend System
 
-Backends implement the `AgentBackend` protocol (`generate(role, prompt, context) -> str`). The `BackendRouter` allows mixing different backends per agent role and maintains a pool of reviewer backends:
+Backends implement the `AgentBackend` protocol (`generate(role, prompt, context) -> str`). The `BackendRouter` allows mixing different backends per agent role and maintains a pool of agent backends:
 
 ```toml
 [defaults]
@@ -69,12 +69,12 @@ backend = "api"
 provider = "anthropic"
 model = "claude-sonnet-4-20250514"
 
-[reviewer_pool.claude_reviewer]
+[agent_pool.claude_reviewer]
 backend = "api"
 provider = "anthropic"
 model = "claude-sonnet-4-20250514"
 
-[reviewer_pool.gpt_reviewer]
+[agent_pool.gpt_reviewer]
 backend = "api"
 provider = "openai"
 model = "gpt-4o"

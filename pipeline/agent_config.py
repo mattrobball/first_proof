@@ -5,8 +5,8 @@ and model each agent role should use.  Settings cascade from ``[defaults]``
 into per-role ``[agents.<role>]`` sections so only overrides need to be
 specified.
 
-A ``[reviewer_pool.<name>]`` section defines named reviewer backends that
-the editor can assign to perspectives at dispatch time.
+A ``[agent_pool.<name>]`` section defines named backends available for
+agent role assignment and reviewer dispatch.
 
 Supported backends:
   - ``api``:  HTTP calls to provider APIs (Anthropic, OpenAI, Gemini, or
@@ -25,12 +25,12 @@ Example ``pipeline.toml``::
     provider = "anthropic"
     model    = "claude-sonnet-4-20250514"
 
-    [reviewer_pool.claude_reviewer]
+    [agent_pool.claude_reviewer]
     backend  = "api"
     provider = "anthropic"
     model    = "claude-sonnet-4-20250514"
 
-    [reviewer_pool.gpt_reviewer]
+    [agent_pool.gpt_reviewer]
     backend  = "api"
     provider = "openai"
     model    = "gpt-4o"
@@ -128,21 +128,21 @@ class PipelineFileConfig:
 
     defaults: AgentModelConfig
     agents: dict[str, AgentModelConfig]
-    reviewer_pool: dict[str, AgentModelConfig] = field(default_factory=dict)
+    agent_pool: dict[str, AgentModelConfig] = field(default_factory=dict)
     randomize_agents: bool = False
 
     def resolve(self, role: str) -> AgentModelConfig:
         """Return effective config for *role*, falling back to defaults."""
         return self.agents.get(role, self.defaults)
 
-    def resolve_reviewer(self, pool_name: str) -> AgentModelConfig:
-        """Return config for a named reviewer pool entry, or raise."""
-        if pool_name not in self.reviewer_pool:
+    def resolve_pool(self, pool_name: str) -> AgentModelConfig:
+        """Return config for a named agent pool entry, or raise."""
+        if pool_name not in self.agent_pool:
             raise ValueError(
-                f"Unknown reviewer pool name: '{pool_name}'. "
-                f"Available: {sorted(self.reviewer_pool)}"
+                f"Unknown agent pool name: '{pool_name}'. "
+                f"Available: {sorted(self.agent_pool)}"
             )
-        return self.reviewer_pool[pool_name]
+        return self.agent_pool[pool_name]
 
 
 # ---- loading helpers --------------------------------------------------------
@@ -168,32 +168,44 @@ def _raw_to_agent_config(
 
 
 def load_config_file(path: Path) -> PipelineFileConfig:
-    """Parse a ``pipeline.toml`` file into a :class:`PipelineFileConfig`."""
+    """Parse a ``pipeline.toml`` file into a :class:`PipelineFileConfig`.
+
+    If no ``[defaults]`` section is present, defaults are synthesised from
+    the first ``[agent_pool.*]`` entry (or a bare ``AgentModelConfig``
+    if the pool is also empty).
+    """
     raw = path.read_text(encoding="utf-8")
     data = tomllib.loads(raw)
 
     defaults_raw: dict[str, Any] = dict(data.get("defaults", {}))
-    defaults = _raw_to_agent_config({}, defaults_raw)
+
+    agent_pool: dict[str, AgentModelConfig] = {}
+    for pool_name, pool_raw in data.get("agent_pool", {}).items():
+        agent_pool[pool_name] = _raw_to_agent_config(defaults_raw, pool_raw)
+
+    # When no [defaults] section exists, fall back to first pool entry.
+    if "defaults" in data:
+        defaults = _raw_to_agent_config({}, defaults_raw)
+    elif agent_pool:
+        defaults = next(iter(agent_pool.values()))
+    else:
+        defaults = AgentModelConfig()
 
     agents: dict[str, AgentModelConfig] = {}
     for role, role_raw in data.get("agents", {}).items():
         agents[role] = _raw_to_agent_config(defaults_raw, role_raw)
 
-    reviewer_pool: dict[str, AgentModelConfig] = {}
-    for pool_name, pool_raw in data.get("reviewer_pool", {}).items():
-        reviewer_pool[pool_name] = _raw_to_agent_config(defaults_raw, pool_raw)
-
     randomize_agents = bool(data.get("randomize_agents", False))
 
     return PipelineFileConfig(
-        defaults=defaults, agents=agents, reviewer_pool=reviewer_pool,
+        defaults=defaults, agents=agents, agent_pool=agent_pool,
         randomize_agents=randomize_agents,
     )
 
 
 APPROVED_BACKENDS: frozenset[tuple[str, str, str]] = frozenset({
     ("cli", "claude", "claude-opus-4-6"),
-    ("cli", "codex", "codex-5.3"),
+    ("cli", "codex", "gpt-5.3-codex"),
     ("api", "gemini", "gemini-3-pro-preview"),
 })
 
@@ -203,8 +215,8 @@ def validate_approved_backends(config: PipelineFileConfig) -> None:
     entries: list[tuple[str, AgentModelConfig]] = [("defaults", config.defaults)]
     for role, cfg in config.agents.items():
         entries.append((f"agents.{role}", cfg))
-    for pool_name, cfg in config.reviewer_pool.items():
-        entries.append((f"reviewer_pool.{pool_name}", cfg))
+    for pool_name, cfg in config.agent_pool.items():
+        entries.append((f"agent_pool.{pool_name}", cfg))
 
     for label, cfg in entries:
         key = (cfg.backend, cfg.provider, cfg.model)

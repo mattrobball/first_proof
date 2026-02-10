@@ -39,7 +39,7 @@ model    = "test-model"
     assert fc.defaults.provider == "anthropic"
     assert fc.defaults.model == "test-model"
     assert fc.agents == {}
-    assert fc.reviewer_pool == {}
+    assert fc.agent_pool == {}
 
 
 def test_load_config_with_per_agent_overrides(tmp_path: Path) -> None:
@@ -107,7 +107,7 @@ temperature = 0.0
     assert sketch.timeout == 300  # inherited
 
 
-def test_load_config_with_reviewer_pool(tmp_path: Path) -> None:
+def test_load_config_with_agent_pool(tmp_path: Path) -> None:
     cfg_path = tmp_path / "pipeline.toml"
     _write(
         cfg_path,
@@ -116,26 +116,26 @@ def test_load_config_with_reviewer_pool(tmp_path: Path) -> None:
 backend  = "demo"
 provider = "anthropic"
 
-[reviewer_pool.claude_reviewer]
+[agent_pool.claude_reviewer]
 backend  = "api"
 provider = "anthropic"
 model    = "claude-sonnet-4-20250514"
 
-[reviewer_pool.gpt_reviewer]
+[agent_pool.gpt_reviewer]
 backend  = "api"
 provider = "openai"
 model    = "gpt-4o"
 """,
     )
     fc = load_config_file(cfg_path)
-    assert "claude_reviewer" in fc.reviewer_pool
-    assert "gpt_reviewer" in fc.reviewer_pool
-    assert fc.reviewer_pool["claude_reviewer"].provider == "anthropic"
-    assert fc.reviewer_pool["gpt_reviewer"].provider == "openai"
-    assert fc.reviewer_pool["gpt_reviewer"].model == "gpt-4o"
+    assert "claude_reviewer" in fc.agent_pool
+    assert "gpt_reviewer" in fc.agent_pool
+    assert fc.agent_pool["claude_reviewer"].provider == "anthropic"
+    assert fc.agent_pool["gpt_reviewer"].provider == "openai"
+    assert fc.agent_pool["gpt_reviewer"].model == "gpt-4o"
 
 
-def test_reviewer_pool_inherits_defaults(tmp_path: Path) -> None:
+def test_agent_pool_inherits_defaults(tmp_path: Path) -> None:
     cfg_path = tmp_path / "pipeline.toml"
     _write(
         cfg_path,
@@ -145,37 +145,37 @@ backend     = "api"
 provider    = "anthropic"
 temperature = 0.3
 
-[reviewer_pool.my_reviewer]
+[agent_pool.my_reviewer]
 model = "custom-model"
 """,
     )
     fc = load_config_file(cfg_path)
-    reviewer = fc.reviewer_pool["my_reviewer"]
+    reviewer = fc.agent_pool["my_reviewer"]
     assert reviewer.backend == "api"
     assert reviewer.provider == "anthropic"
     assert reviewer.temperature == 0.3
     assert reviewer.model == "custom-model"
 
 
-def test_resolve_reviewer_found() -> None:
+def test_resolve_pool_found() -> None:
     pool = {"reviewer_a": AgentModelConfig(backend="demo")}
     fc = PipelineFileConfig(
         defaults=AgentModelConfig(backend="demo"),
         agents={},
-        reviewer_pool=pool,
+        agent_pool=pool,
     )
-    cfg = fc.resolve_reviewer("reviewer_a")
+    cfg = fc.resolve_pool("reviewer_a")
     assert cfg.backend == "demo"
 
 
-def test_resolve_reviewer_unknown_raises() -> None:
+def test_resolve_pool_unknown_raises() -> None:
     fc = PipelineFileConfig(
         defaults=AgentModelConfig(backend="demo"),
         agents={},
-        reviewer_pool={},
+        agent_pool={},
     )
-    with pytest.raises(ValueError, match="Unknown reviewer pool name"):
-        fc.resolve_reviewer("nonexistent")
+    with pytest.raises(ValueError, match="Unknown agent pool name"):
+        fc.resolve_pool("nonexistent")
 
 
 # ---------------------------------------------------------------------------
@@ -280,9 +280,21 @@ def test_load_pipeline_toml() -> None:
     """The real pipeline.toml at the project root parses without error."""
     root = Path(__file__).resolve().parent.parent / "pipeline.toml"
     fc = load_config_file(root)
-    assert fc.defaults.backend == "cli"
-    assert fc.defaults.provider == "codex"
-    assert len(fc.reviewer_pool) >= 3
+    # No [defaults] section — defaults synthesised from first pool entry
+    assert fc.defaults.backend in ("cli", "api")
+    assert len(fc.agent_pool) >= 3
+
+
+def test_no_defaults_uses_first_pool_entry(tmp_path: Path) -> None:
+    """When [defaults] is absent, defaults come from first pool entry."""
+    cfg_path = tmp_path / "pipeline.toml"
+    cfg_path.write_text(
+        '[agent_pool.my_backend]\nbackend = "demo"\nprovider = "test"\nmodel = "m1"\n',
+        encoding="utf-8",
+    )
+    fc = load_config_file(cfg_path)
+    assert fc.defaults.backend == "demo"
+    assert fc.defaults.provider == "test"
 
 
 # ---------------------------------------------------------------------------
@@ -292,18 +304,24 @@ def test_load_pipeline_toml() -> None:
 
 def _approved_config(**pool_overrides: dict) -> PipelineFileConfig:
     """Build a PipelineFileConfig using only approved backends."""
+    pool = {
+        "claude_code": AgentModelConfig(
+            backend="cli", provider="claude", model="claude-opus-4-6",
+        ),
+        "codex_cli": AgentModelConfig(
+            backend="cli", provider="codex", model="gpt-5.3-codex",
+        ),
+        "gemini_api": AgentModelConfig(
+            backend="api", provider="gemini", model="gemini-3-pro-preview",
+        ),
+        **pool_overrides,
+    }
+    # Defaults from first pool entry (mirrors no-[defaults] behaviour)
+    defaults = next(iter(pool.values()))
     return PipelineFileConfig(
-        defaults=AgentModelConfig(backend="cli", provider="codex", model="codex-5.3"),
+        defaults=defaults,
         agents={},
-        reviewer_pool={
-            "claude_reviewer": AgentModelConfig(
-                backend="cli", provider="claude", model="claude-opus-4-6",
-            ),
-            "gemini_reviewer": AgentModelConfig(
-                backend="api", provider="gemini", model="gemini-3-pro-preview",
-            ),
-            **pool_overrides,
-        },
+        agent_pool=pool,
     )
 
 
@@ -336,7 +354,7 @@ def test_all_pool_entries_validated() -> None:
             backend="cli", provider="gemini", model="gemini-3-pro-preview",
         ),
     )
-    with pytest.raises(ValueError, match="reviewer_pool.bad_reviewer"):
+    with pytest.raises(ValueError, match="agent_pool.bad_reviewer"):
         validate_approved_backends(fc)
 
 
@@ -365,7 +383,7 @@ def test_codex_reasoning_effort_from_config() -> None:
     from unittest.mock import patch
 
     cfg = AgentModelConfig(
-        backend="cli", provider="codex", model="codex-5.3",
+        backend="cli", provider="codex", model="gpt-5.3-codex",
         reasoning_effort="xhigh",
     )
     with patch("shutil.which", return_value="/usr/bin/codex"):

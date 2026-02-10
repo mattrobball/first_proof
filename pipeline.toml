@@ -1,24 +1,18 @@
 randomize_agents = true
 
-[defaults]
-backend  = "cli"
-provider = "codex"
-model    = "codex-5.3"
-reasoning_effort = "xhigh"
-
-[reviewer_pool.claude_reviewer]
+[agent_pool.claude_code]
 backend  = "cli"
 provider = "claude"
 model    = "claude-opus-4-6"
 reasoning_effort = "high"
 
-[reviewer_pool.codex_reviewer]
+[agent_pool.codex_cli]
 backend  = "cli"
 provider = "codex"
-model    = "codex-5.3"
+model    = "gpt-5.3-codex"
 reasoning_effort = "xhigh"
 
-[reviewer_pool.gemini_reviewer]
+[agent_pool.gemini_api]
 backend  = "api"
 provider = "gemini"
 model    = "gemini-3-pro-preview"
