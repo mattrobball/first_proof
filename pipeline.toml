@@ -13,7 +13,7 @@ provider = "codex"
 model    = "gpt-5.3-codex"
 reasoning_effort = "xhigh"
 
-[reviewer_pool.gemini_reviewer]
+[reviewer_pool.gemini_api]
 backend  = "api"
 provider = "gemini"
 model    = "gemini-3-pro-preview"

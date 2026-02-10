@@ -222,7 +222,9 @@ def run_pipeline(
     persp_desc = _build_perspectives_description(perspective_pairs)
 
     # --- Researcher (once, pre-loop) ---
-    _log_shuffle(backend.shuffle(), "researcher")
+    researcher_pick = backend.pick_role("researcher")
+    if researcher_pick:
+        _status(f"researcher -> {researcher_pick}")
     _status("researcher ...")
     researcher_context = {
         "problem_id": problem_inputs.problem_id,

@@ -339,7 +339,7 @@ def _approved_config(**pool_overrides: dict) -> PipelineFileConfig:
         "codex_cli": AgentModelConfig(
             backend="cli", provider="codex", model="gpt-5.3-codex",
         ),
-        "gemini_reviewer": AgentModelConfig(
+        "gemini_api": AgentModelConfig(
             backend="api", provider="gemini", model="gemini-3-pro-preview",
         ),
         **pool_overrides,

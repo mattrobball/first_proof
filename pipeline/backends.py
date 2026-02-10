@@ -73,6 +73,21 @@ class BackendRouter:
         backend = self.pool_backends[pool_name]
         return backend.generate(role, prompt, context)
 
+    def pick_role(self, role: str) -> str | None:
+        """Randomly assign a single *role* from the eligible pool.
+
+        Returns the chosen pool name, or ``None`` when randomization is
+        not configured or the role has an explicit override.
+        """
+        if not self.rng or not self.eligible_pool:
+            return None
+        if role in self.fixed_roles:
+            return None
+        pool_names = sorted(self.eligible_pool)
+        chosen = self.rng.choice(pool_names)
+        self.role_backends[role] = self.eligible_pool[chosen]
+        return chosen
+
     def shuffle(self) -> dict[str, str]:
         """Re-randomize non-reviewer role assignments.
 
