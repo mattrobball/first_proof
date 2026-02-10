@@ -17,19 +17,19 @@ editor synthesizes their feedback into a revision decision.
 
 The loop repeats until the editor accepts or the loop budget is exhausted.
 
-## Problem Folder Contract
+## Problem Folders
 
-Each problem must live in its own folder (for example `5/`) and include:
-- `QUESTION.md` (required)
-- `BACKGROUND.md` (required)
+Problem folders are created automatically at pipeline start. When you run
+`--problem 5`, the pipeline will:
 
-If `QUESTION.md` is missing and `first_proof.md` is found in the repo root,
-the pipeline will auto-extract the matching question by problem number.
+1. Create the `5/` directory if it doesn't exist
+2. Extract **Question 5** from `first_proof.md` into `5/QUESTION.md`
+3. Create a stub `5/BACKGROUND.md` if missing
 
-Run artifacts are written to:
-- `N/runs/<timestamp>-transcript.md`
-- `N/runs/<timestamp>-report.tex`
-- `N/runs/<timestamp>-meta.json`
+You can also create these files manually. Existing files are never overwritten.
+
+Run artifacts are written to `N/runs/` (gitignored on `main`; archived on the
+`live_runs` branch).
 
 ## Quickstart
 
@@ -126,6 +126,14 @@ credentials there instead of exporting them in your shell.
 - `1`: not accepted after max loops
 - `2`: input or prompt validation failure
 - `3`: backend or runtime failure
+
+## Branches
+
+- **`main`** — production pipeline code (run artifacts are gitignored)
+- **`digital_twin`** — a more realistic model of the academic peer review
+  process 😉
+- **`live_runs`** — archived transcripts, LaTeX reports, and metadata from
+  past pipeline runs
 
 ## Testing
 
