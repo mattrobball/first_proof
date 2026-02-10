@@ -20,7 +20,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
-from .agent_config import AgentModelConfig
+from .agent_config import AgentModelConfig, _PROVIDER_DEFAULTS
 
 
 # ---------------------------------------------------------------------------
@@ -133,6 +133,30 @@ class OpenAIBackend:
 # Google Gemini API
 # ---------------------------------------------------------------------------
 
+def gemini_list_models(api_key: str) -> list[str]:
+    """Return model IDs visible to *api_key* (health-check / auth test)."""
+    url = (
+        f"{_PROVIDER_DEFAULTS['gemini']['api_base']}"
+        f"/v1beta/models?key={api_key}&pageSize=1000"
+    )
+    req = urllib.request.Request(url, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        error_body = ""
+        try:
+            error_body = exc.read().decode()[:2000]
+        except Exception:
+            pass
+        raise RuntimeError(
+            f"Gemini list-models failed ({exc.code}): {error_body}"
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Network error: {exc.reason}") from exc
+    return [m["name"] for m in data.get("models", [])]
+
+
 @dataclass
 class GeminiBackend:
     """Calls the Google Generative Language API (Gemini)."""
@@ -157,6 +181,10 @@ class GeminiBackend:
             gen_cfg["maxOutputTokens"] = self.cfg.max_tokens
         if self.cfg.temperature is not None:
             gen_cfg["temperature"] = self.cfg.temperature
+        if self.cfg.reasoning_effort:
+            gen_cfg["thinkingConfig"] = {
+                "thinkingLevel": self.cfg.reasoning_effort,
+            }
 
         resp = _post_json(url, headers, body, self.cfg.timeout)
 
