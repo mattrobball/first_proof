@@ -13,6 +13,7 @@ Supported CLI tools:
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
@@ -149,10 +150,11 @@ class CodexCLIBackend:
 
 @dataclass
 class ClaudeCLIBackend:
-    """Runs one ``claude -p`` invocation per agent turn."""
+    """Runs one agentic ``claude --print`` invocation per agent turn."""
 
     cfg: AgentModelConfig
     workdir: Path | None = None
+    max_turns: int = 25
 
     def __post_init__(self) -> None:
         binary = self.cfg.resolved_cli_command()
@@ -164,7 +166,14 @@ class ClaudeCLIBackend:
         self._resolved_bin = resolved
 
     def _command(self) -> list[str]:
-        cmd = [self._resolved_bin, "--print", "--output-format", "text"]
+        cmd = [
+            self._resolved_bin, "--print",
+            "--output-format", "json",
+            "--dangerously-skip-permissions",
+            "--max-turns", str(self.max_turns),
+            "--tools", "Read,Glob,Grep,WebSearch,WebFetch",
+            "--no-session-persistence",
+        ]
         if self.cfg.model:
             cmd.extend(["--model", self.cfg.model])
         if self.cfg.reasoning_effort:
@@ -191,18 +200,34 @@ class ClaudeCLIBackend:
             cwd=cwd,
         )
 
-        if proc.returncode == 0:
-            text = proc.stdout.strip()
-            if text:
-                return text
+        stdout = proc.stdout.strip()
+
+        # Try to parse structured JSON output
+        try:
+            data = json.loads(stdout)
+            subtype = data.get("subtype", "")
+            if subtype.startswith("error_"):
+                raise RuntimeError(
+                    f"Claude CLI agent error for role '{role}': "
+                    f"{subtype} — {data.get('result', '')}"
+                )
+            result = data.get("result", "").strip()
+            if result:
+                return result
+        except (json.JSONDecodeError, AttributeError):
+            # Fall back to raw stdout if JSON parsing fails
+            if proc.returncode == 0 and stdout:
+                return stdout
+
+        if proc.returncode != 0:
+            stderr_snippet = self._trim(proc.stderr)
             raise RuntimeError(
-                f"Claude CLI returned empty output for role '{role}'"
+                f"Claude CLI failed for role '{role}' with exit code "
+                f"{proc.returncode}. stderr: {stderr_snippet!r}"
             )
 
-        stderr_snippet = self._trim(proc.stderr)
         raise RuntimeError(
-            f"Claude CLI failed for role '{role}' with exit code "
-            f"{proc.returncode}. stderr: {stderr_snippet!r}"
+            f"Claude CLI returned empty output for role '{role}'"
         )
 
 

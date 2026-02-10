@@ -400,6 +400,14 @@ def test_claude_effort_from_config() -> None:
         from pipeline.cli_backends import ClaudeCLIBackend
         backend = ClaudeCLIBackend(cfg=cfg)
     cmd = backend._command()
+    # Agentic flags
+    assert "--output-format" in cmd
+    assert cmd[cmd.index("--output-format") + 1] == "json"
+    assert "--dangerously-skip-permissions" in cmd
+    assert "--max-turns" in cmd
+    assert "--tools" in cmd
+    assert "--no-session-persistence" in cmd
+    # Reasoning effort still passed through
     assert "--effort" in cmd
     idx = cmd.index("--effort")
     assert cmd[idx + 1] == "high"
