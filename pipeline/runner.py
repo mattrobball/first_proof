@@ -426,7 +426,17 @@ def _resolve_backend(
         file_config = load_config_file(config_file)
         validate_approved_backends(file_config)
         print(f"[info] Using config: {config_file}", file=sys.stderr)
-        return build_backend_from_config(file_config, workdir=Path.cwd())
+        router, assignments = build_backend_from_config(
+            file_config, workdir=Path.cwd(), seed=config.seed,
+        )
+        for role, pool_name in sorted(assignments.items()):
+            cfg = file_config.reviewer_pool.get(pool_name, file_config.defaults)
+            print(
+                f"[info] {role} -> {pool_name} "
+                f"({cfg.backend}/{cfg.provider}/{cfg.model})",
+                file=sys.stderr,
+            )
+        return router
 
     # Fall back to legacy single-backend mode
     return build_backend(

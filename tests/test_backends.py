@@ -105,10 +105,70 @@ def test_build_backend_from_config_creates_router_with_pool() -> None:
     agents = {"prover": AgentModelConfig(backend="demo")}
     pool = {"claude_reviewer": AgentModelConfig(backend="demo")}
     fc = PipelineFileConfig(defaults=defaults, agents=agents, reviewer_pool=pool)
-    router = build_backend_from_config(fc)
+    router, assignments = build_backend_from_config(fc)
     assert isinstance(router, BackendRouter)
     assert "prover" in router.role_backends
     assert "claude_reviewer" in router.pool_backends
+    assert assignments == {}  # not randomizing
+
+
+# ---------------------------------------------------------------------------
+# Randomized agent assignment
+# ---------------------------------------------------------------------------
+
+
+def test_randomize_assigns_all_roles() -> None:
+    """With randomize_agents=True, all 5 non-reviewer roles get assignments."""
+    defaults = AgentModelConfig(backend="demo")
+    pool = {
+        "reviewer_a": AgentModelConfig(backend="demo"),
+        "reviewer_b": AgentModelConfig(backend="demo"),
+    }
+    fc = PipelineFileConfig(
+        defaults=defaults, agents={}, reviewer_pool=pool,
+        randomize_agents=True,
+    )
+    _router, assignments = build_backend_from_config(fc, seed=42)
+    expected_roles = {"researcher", "mentor", "prover", "editor_dispatch", "editor_decision"}
+    assert set(assignments) == expected_roles
+    valid_pool_names = {"defaults", "reviewer_a", "reviewer_b"}
+    for pool_name in assignments.values():
+        assert pool_name in valid_pool_names
+
+
+def test_randomize_seed_deterministic() -> None:
+    """Same seed produces identical assignments."""
+    defaults = AgentModelConfig(backend="demo")
+    pool = {
+        "reviewer_a": AgentModelConfig(backend="demo"),
+        "reviewer_b": AgentModelConfig(backend="demo"),
+    }
+    fc = PipelineFileConfig(
+        defaults=defaults, agents={}, reviewer_pool=pool,
+        randomize_agents=True,
+    )
+    _, a1 = build_backend_from_config(fc, seed=99)
+    _, a2 = build_backend_from_config(fc, seed=99)
+    assert a1 == a2
+
+
+def test_randomize_respects_explicit_agents() -> None:
+    """Roles with explicit [agents.<role>] overrides are not randomized."""
+    defaults = AgentModelConfig(backend="demo")
+    agents = {"prover": AgentModelConfig(backend="demo")}
+    pool = {"reviewer_a": AgentModelConfig(backend="demo")}
+    fc = PipelineFileConfig(
+        defaults=defaults, agents=agents, reviewer_pool=pool,
+        randomize_agents=True,
+    )
+    router, assignments = build_backend_from_config(fc, seed=42)
+    assert "prover" not in assignments
+    assert "prover" in router.role_backends  # still has its explicit backend
+    # All other non-reviewer roles should be assigned
+    assert "researcher" in assignments
+    assert "mentor" in assignments
+    assert "editor_dispatch" in assignments
+    assert "editor_decision" in assignments
 
 
 # ---------------------------------------------------------------------------

@@ -248,6 +248,34 @@ def test_find_config_returns_none_when_absent(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_randomize_agents_parsed(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "pipeline.toml"
+    _write(
+        cfg_path,
+        """\
+randomize_agents = true
+
+[defaults]
+backend = "demo"
+""",
+    )
+    fc = load_config_file(cfg_path)
+    assert fc.randomize_agents is True
+
+
+def test_randomize_agents_default_false(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "pipeline.toml"
+    _write(
+        cfg_path,
+        """\
+[defaults]
+backend = "demo"
+""",
+    )
+    fc = load_config_file(cfg_path)
+    assert fc.randomize_agents is False
+
+
 def test_load_pipeline_toml() -> None:
     """The real pipeline.toml at the project root parses without error."""
     root = Path(__file__).resolve().parent.parent / "pipeline.toml"

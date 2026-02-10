@@ -129,6 +129,7 @@ class PipelineFileConfig:
     defaults: AgentModelConfig
     agents: dict[str, AgentModelConfig]
     reviewer_pool: dict[str, AgentModelConfig] = field(default_factory=dict)
+    randomize_agents: bool = False
 
     def resolve(self, role: str) -> AgentModelConfig:
         """Return effective config for *role*, falling back to defaults."""
@@ -182,8 +183,11 @@ def load_config_file(path: Path) -> PipelineFileConfig:
     for pool_name, pool_raw in data.get("reviewer_pool", {}).items():
         reviewer_pool[pool_name] = _raw_to_agent_config(defaults_raw, pool_raw)
 
+    randomize_agents = bool(data.get("randomize_agents", False))
+
     return PipelineFileConfig(
-        defaults=defaults, agents=agents, reviewer_pool=reviewer_pool
+        defaults=defaults, agents=agents, reviewer_pool=reviewer_pool,
+        randomize_agents=randomize_agents,
     )
 
 

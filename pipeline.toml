@@ -1,3 +1,5 @@
+randomize_agents = true
+
 [defaults]
 backend  = "cli"
 provider = "codex"

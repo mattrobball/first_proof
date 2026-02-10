@@ -10,6 +10,7 @@ dispatch to individual perspectives.
 from __future__ import annotations
 
 import json
+import random
 import re
 import shutil
 import subprocess
@@ -376,14 +377,29 @@ def _build_single_backend(cfg: AgentModelConfig, workdir: Path | None = None) ->
     raise ValueError(f"Unsupported backend type: '{cfg.backend}'")
 
 
+_NON_REVIEWER_ROLES = (
+    "researcher", "mentor", "prover", "editor_dispatch", "editor_decision",
+)
+
+
 def build_backend_from_config(
-    file_config: PipelineFileConfig, workdir: Path | None = None
-) -> BackendRouter:
+    file_config: PipelineFileConfig,
+    workdir: Path | None = None,
+    seed: int | None = None,
+) -> tuple[BackendRouter, dict[str, str]]:
     """Create a :class:`BackendRouter` from a parsed TOML config.
 
     Each agent role defined in ``[agents.<role>]`` gets its own backend; all
     other roles fall back to ``[defaults]``.  Reviewer pool entries become
     ``pool_backends``.
+
+    When ``file_config.randomize_agents`` is True, non-reviewer roles without
+    an explicit ``[agents.<role>]`` override are randomly assigned a backend
+    from the combined pool (defaults + reviewer_pool entries).
+
+    Returns ``(router, assignments)`` where *assignments* maps
+    ``role -> pool_name`` for any randomly assigned roles (empty dict when
+    not randomizing).
     """
     default_backend = _build_single_backend(file_config.defaults, workdir)
     role_backends: dict[str, AgentBackend] = {}
@@ -394,10 +410,36 @@ def build_backend_from_config(
     for pool_name, cfg in file_config.reviewer_pool.items():
         pool_backends[pool_name] = _build_single_backend(cfg, workdir)
 
-    return BackendRouter(
-        role_backends=role_backends,
-        default_backend=default_backend,
-        pool_backends=pool_backends,
+    assignments: dict[str, str] = {}
+
+    if file_config.randomize_agents:
+        # Build named pool: defaults + reviewer_pool entries
+        named_configs: dict[str, AgentModelConfig] = {
+            "defaults": file_config.defaults,
+            **file_config.reviewer_pool,
+        }
+        pool_names = sorted(named_configs)
+        rng = random.Random(seed)
+
+        # Pre-build backends for each named config (reuse existing where possible)
+        named_backends: dict[str, AgentBackend] = {"defaults": default_backend}
+        for pn in file_config.reviewer_pool:
+            named_backends[pn] = pool_backends[pn]
+
+        for role in _NON_REVIEWER_ROLES:
+            if role in file_config.agents:
+                continue  # explicit override takes precedence
+            chosen = rng.choice(pool_names)
+            assignments[role] = chosen
+            role_backends[role] = named_backends[chosen]
+
+    return (
+        BackendRouter(
+            role_backends=role_backends,
+            default_backend=default_backend,
+            pool_backends=pool_backends,
+        ),
+        assignments,
     )
 
 
