@@ -5,6 +5,9 @@ and model each agent role should use.  Settings cascade from ``[defaults]``
 into per-role ``[agents.<role>]`` sections so only overrides need to be
 specified.
 
+A ``[reviewer_pool.<name>]`` section defines named reviewer backends that
+the editor can assign to perspectives at dispatch time.
+
 Supported backends:
   - ``api``:  HTTP calls to provider APIs (Anthropic, OpenAI, Gemini, or
               any OpenAI-compatible endpoint via ``provider = "openai_compat"``).
@@ -14,17 +17,23 @@ Supported backends:
 Example ``pipeline.toml``::
 
     [defaults]
+    backend  = "cli"
+    provider = "codex"
+
+    [agents.editor]
     backend  = "api"
     provider = "anthropic"
     model    = "claude-sonnet-4-20250514"
 
-    [agents.prover]
+    [reviewer_pool.claude_reviewer]
+    backend  = "api"
+    provider = "anthropic"
+    model    = "claude-sonnet-4-20250514"
+
+    [reviewer_pool.gpt_reviewer]
+    backend  = "api"
     provider = "openai"
     model    = "gpt-4o"
-
-    [agents.critic]
-    backend     = "cli"
-    cli_command  = "claude"
 """
 
 from __future__ import annotations
@@ -35,7 +44,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-# ---- provider → default env-var / base-url mapping -------------------------
+# ---- provider -> default env-var / base-url mapping -------------------------
 
 _PROVIDER_DEFAULTS: dict[str, dict[str, str]] = {
     "anthropic": {
@@ -118,10 +127,20 @@ class PipelineFileConfig:
 
     defaults: AgentModelConfig
     agents: dict[str, AgentModelConfig]
+    reviewer_pool: dict[str, AgentModelConfig] = field(default_factory=dict)
 
     def resolve(self, role: str) -> AgentModelConfig:
         """Return effective config for *role*, falling back to defaults."""
         return self.agents.get(role, self.defaults)
+
+    def resolve_reviewer(self, pool_name: str) -> AgentModelConfig:
+        """Return config for a named reviewer pool entry, or raise."""
+        if pool_name not in self.reviewer_pool:
+            raise ValueError(
+                f"Unknown reviewer pool name: '{pool_name}'. "
+                f"Available: {sorted(self.reviewer_pool)}"
+            )
+        return self.reviewer_pool[pool_name]
 
 
 # ---- loading helpers --------------------------------------------------------
@@ -158,7 +177,13 @@ def load_config_file(path: Path) -> PipelineFileConfig:
     for role, role_raw in data.get("agents", {}).items():
         agents[role] = _raw_to_agent_config(defaults_raw, role_raw)
 
-    return PipelineFileConfig(defaults=defaults, agents=agents)
+    reviewer_pool: dict[str, AgentModelConfig] = {}
+    for pool_name, pool_raw in data.get("reviewer_pool", {}).items():
+        reviewer_pool[pool_name] = _raw_to_agent_config(defaults_raw, pool_raw)
+
+    return PipelineFileConfig(
+        defaults=defaults, agents=agents, reviewer_pool=reviewer_pool
+    )
 
 
 def find_config_file(

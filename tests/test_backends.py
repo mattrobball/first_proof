@@ -26,6 +26,12 @@ def test_build_backend_unknown_raises() -> None:
         build_backend("openai", model="gpt-5")
 
 
+def test_build_backend_demo_returns_router() -> None:
+    router = build_backend("demo", model=None)
+    assert isinstance(router, BackendRouter)
+    assert "default_reviewer" in router.pool_backends
+
+
 # ---------------------------------------------------------------------------
 # BackendRouter
 # ---------------------------------------------------------------------------
@@ -49,7 +55,37 @@ def test_backend_router_dispatches_by_role() -> None:
     )
     assert router.generate("prover", "", {}) == "prover-backend:prover"
     assert router.generate("statement", "", {}) == "default:statement"
-    assert router.generate("critic", "", {}) == "default:critic"
+    assert router.generate("editor_dispatch", "", {}) == "default:editor_dispatch"
+
+
+def test_generate_with_pool() -> None:
+    class _FakeBackend:
+        def __init__(self, tag: str) -> None:
+            self.tag = tag
+
+        def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
+            return f"{self.tag}:{role}"
+
+    default = _FakeBackend("default")
+    pool_a = _FakeBackend("pool-a")
+    pool_b = _FakeBackend("pool-b")
+    router = BackendRouter(
+        role_backends={},
+        default_backend=default,
+        pool_backends={"reviewer_a": pool_a, "reviewer_b": pool_b},
+    )
+    assert router.generate_with_pool("reviewer_a", "reviewer", "", {}) == "pool-a:reviewer"
+    assert router.generate_with_pool("reviewer_b", "reviewer", "", {}) == "pool-b:reviewer"
+
+
+def test_generate_with_pool_unknown_raises() -> None:
+    router = BackendRouter(
+        role_backends={},
+        default_backend=DemoBackend(),
+        pool_backends={},
+    )
+    with pytest.raises(ValueError, match="Unknown pool backend"):
+        router.generate_with_pool("nonexistent", "reviewer", "", {})
 
 
 def test_build_single_backend_demo() -> None:
@@ -64,13 +100,15 @@ def test_build_single_backend_unknown_raises() -> None:
         _build_single_backend(cfg)
 
 
-def test_build_backend_from_config_creates_router() -> None:
+def test_build_backend_from_config_creates_router_with_pool() -> None:
     defaults = AgentModelConfig(backend="demo")
     agents = {"prover": AgentModelConfig(backend="demo")}
-    fc = PipelineFileConfig(defaults=defaults, agents=agents)
+    pool = {"claude_reviewer": AgentModelConfig(backend="demo")}
+    fc = PipelineFileConfig(defaults=defaults, agents=agents, reviewer_pool=pool)
     router = build_backend_from_config(fc)
     assert isinstance(router, BackendRouter)
     assert "prover" in router.role_backends
+    assert "claude_reviewer" in router.pool_backends
 
 
 # ---------------------------------------------------------------------------

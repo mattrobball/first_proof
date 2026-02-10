@@ -7,7 +7,9 @@ ROLE_TO_TEMPLATE = {
     "statement": "statement.md",
     "sketch": "sketch.md",
     "prover": "prover.md",
-    "critic": "critic.md",
+    "editor_dispatch": "editor_dispatch.md",
+    "editor_decision": "editor_decision.md",
+    "reviewer": "reviewer.md",
 }
 
 

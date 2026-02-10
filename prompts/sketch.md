@@ -11,8 +11,8 @@ Current statement output:
 Previous transcript excerpt:
 {prior_transcript}
 
-Outstanding critic issues:
-{critic_issues_markdown}
+Editor feedback from previous loop:
+{editor_feedback}
 
 Task:
 1. Propose a rigorous proof strategy.

@@ -1,78 +1,34 @@
-# pipeline.toml — per-agent backend and model configuration
+# Example pipeline.toml — managing editor architecture
 #
-# Copy this file to pipeline.toml (in the project root or a problem directory)
-# and adjust the settings below.  The pipeline discovers it automatically.
-#
-# Backend types:
-#   "api"  — HTTP API call (Anthropic, OpenAI, Gemini, or any OpenAI-compatible endpoint)
-#   "cli"  — Local CLI tool (codex, claude, or any stdin→stdout binary)
-#   "demo" — Deterministic stub for testing
-#
-# Supported API providers:
-#   "anthropic"    — Anthropic Messages API  (env: ANTHROPIC_API_KEY)
-#   "openai"       — OpenAI Chat Completions (env: OPENAI_API_KEY)
-#   "gemini"       — Google Generative Language API (env: GEMINI_API_KEY)
-#   "openai_compat"— Any OpenAI-compatible endpoint (set api_base + api_key_env)
-#
-# Supported CLI providers:
-#   "codex"  — OpenAI Codex CLI (codex exec -)
-#   "claude" — Anthropic Claude Code CLI (claude --print)
-#   Or set cli_command to any binary that reads stdin and writes stdout.
-
-# ── Defaults ─────────────────────────────────────────────────────────────────
-# Every agent inherits these settings unless overridden in [agents.<role>].
+# [defaults] provides fallback values for all agents.
+# [agents.<role>] overrides per agent role (statement, sketch, prover,
+#   editor_dispatch, editor_decision).
+# [reviewer_pool.<name>] defines named reviewer backends that the editor
+#   can assign to perspectives at dispatch time.
 
 [defaults]
-backend     = "api"
-provider    = "anthropic"
-model       = "claude-sonnet-4-20250514"
-temperature = 0.2
-max_tokens  = 16384
-timeout     = 600
+backend  = "cli"
+provider = "codex"
 
-# ── Per-agent overrides ──────────────────────────────────────────────────────
-# Only the fields you specify here override the defaults.
+# The editor agents (dispatch + decision) typically use an API backend
+# since they need strong reasoning for synthesis.
+[agents.editor_dispatch]
+backend  = "api"
+provider = "anthropic"
+model    = "claude-sonnet-4-20250514"
 
-# [agents.statement]
-# provider = "openai"
-# model    = "gpt-4o"
+[agents.editor_decision]
+backend  = "api"
+provider = "anthropic"
+model    = "claude-sonnet-4-20250514"
 
-# [agents.sketch]
-# # inherits defaults
+# Reviewer pool — the editor assigns these to perspectives
+[reviewer_pool.claude_reviewer]
+backend  = "api"
+provider = "anthropic"
+model    = "claude-sonnet-4-20250514"
 
-# [agents.prover]
-# provider = "anthropic"
-# model    = "claude-sonnet-4-20250514"
-
-# [agents.critic]
-# provider = "gemini"
-# model    = "gemini-2.0-flash"
-
-# ── Example: all agents use a local Codex CLI ────────────────────────────────
-# [defaults]
-# backend  = "cli"
-# provider = "codex"
-# model    = "o3"
-# timeout  = 600
-
-# ── Example: mix API and CLI ─────────────────────────────────────────────────
-# [defaults]
-# backend  = "api"
-# provider = "anthropic"
-# model    = "claude-sonnet-4-20250514"
-#
-# [agents.prover]
-# provider = "openai"
-# model    = "o3"
-#
-# [agents.critic]
-# backend     = "cli"
-# provider    = "claude"
-
-# ── Example: self-hosted / OpenAI-compatible endpoint ────────────────────────
-# [defaults]
-# backend     = "api"
-# provider    = "openai_compat"
-# api_base    = "http://localhost:8000"
-# api_key_env = "LOCAL_LLM_KEY"
-# model       = "my-local-model"
+[reviewer_pool.gpt_reviewer]
+backend  = "api"
+provider = "openai"
+model    = "gpt-4o"

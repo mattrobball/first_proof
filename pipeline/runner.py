@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .agent_config import find_config_file, load_config_file
 from .agents import render_prompt
-from .backends import AgentBackend, build_backend, build_backend_from_config
+from .backends import BackendRouter, build_backend, build_backend_from_config
 from .config import PipelineConfig
 from .io import (
     InputValidationError,
@@ -19,33 +19,50 @@ from .io import (
     write_meta,
     write_text,
 )
-from .models import CouncilResult, CriticIssue, CriticResult, LoopRecord, PipelineRunResult
-from .validate import OutputValidationError, ensure_required_sections, parse_critic_output
+from .models import (
+    EditorDecision,
+    EditorDispatch,
+    EditorVerdict,
+    LoopRecord,
+    PipelineRunResult,
+    ReviewerResult,
+)
+from .validate import (
+    OutputValidationError,
+    ensure_required_sections,
+    parse_editor_decision_output,
+    parse_editor_dispatch_output,
+    parse_reviewer_output,
+)
 
 
-def _issues_to_markdown(issues: list[CriticIssue], critics: list[CriticResult] | None = None) -> str:
-    if critics is not None:
-        lines = []
-        idx = 0
-        for cr in critics:
-            for issue in cr.issues:
-                idx += 1
-                lines.append(
-                    f"{idx}. [{issue.severity}] ({cr.critic_name}) {issue.location}: "
-                    f"{issue.reason} (required fix: {issue.required_fix}) "
-                    f"[suggestion: {issue.suggestion}]"
-                )
-        return "\n".join(lines) if lines else "None."
+def _reviews_to_markdown(reviewer_results: list[ReviewerResult]) -> str:
+    lines: list[str] = []
+    idx = 0
+    for rr in reviewer_results:
+        for issue in rr.issues:
+            idx += 1
+            lines.append(
+                f"{idx}. [{issue.severity}] ({rr.perspective_name}) {issue.location}: "
+                f"{issue.reason} (required fix: {issue.required_fix}) "
+                f"[suggestion: {issue.suggestion}]"
+            )
+    return "\n".join(lines) if lines else "None."
 
-    if not issues:
-        return "None."
+
+def _build_pool_description(pool_names: list[str]) -> str:
+    if not pool_names:
+        return "No reviewers available."
+    lines = [f"- **{name}**" for name in pool_names]
+    return "\n".join(lines)
+
+
+def _build_perspectives_description(
+    perspectives: list[tuple[str, str]],
+) -> str:
     lines = []
-    for idx, issue in enumerate(issues, start=1):
-        lines.append(
-            f"{idx}. [{issue.severity}] {issue.location}: {issue.reason} "
-            f"(required fix: {issue.required_fix}) "
-            f"[suggestion: {issue.suggestion}]"
-        )
+    for i, (name, desc) in enumerate(perspectives, start=1):
+        lines.append(f"{i}. **{name}**: {desc}")
     return "\n".join(lines)
 
 
@@ -59,8 +76,13 @@ def _format_loop_for_context(loop: LoopRecord) -> str:
         "### Prover\n"
         f"{loop.prover_text.strip()}\n"
     ]
-    for critic_name, critic_text in loop.critic_texts.items():
-        parts.append(f"### Critic — {critic_name}\n{critic_text.strip()}\n")
+    for persp_name, reviewer_text in loop.reviewer_texts.items():
+        parts.append(f"### Reviewer — {persp_name}\n{reviewer_text.strip()}\n")
+    decision = loop.editor_decision
+    parts.append(
+        f"### Editor Decision — {decision.verdict}\n"
+        f"{decision.summary}\n"
+    )
     return "".join(parts)
 
 
@@ -72,8 +94,7 @@ def _build_context(
     loop_index: int,
     max_loops: int,
     prior_transcript: str,
-    critic_issues: list[CriticIssue],
-    council_critics: list[CriticResult] | None = None,
+    editor_feedback: str,
 ) -> dict[str, str]:
     return {
         "problem_id": problem_id,
@@ -83,22 +104,23 @@ def _build_context(
         "loop_index": str(loop_index),
         "max_loops": str(max_loops),
         "prior_transcript": prior_transcript.strip() or "None.",
-        "critic_issues_markdown": _issues_to_markdown(critic_issues, council_critics),
+        "editor_feedback": editor_feedback,
     }
 
 
 def _aggregate_issue_counts(loops: list[LoopRecord]) -> dict[str, int]:
     counts: dict[str, int] = {"critical": 0, "major": 0, "minor": 0}
     for loop in loops:
-        for issue in loop.council_result.all_issues:
-            counts[issue.severity] += 1
+        for rr in loop.editor_decision.reviewer_results:
+            for issue in rr.issues:
+                counts[issue.severity] += 1
     return counts
 
 
 def run_pipeline(
     problem_dir: Path,
     config: PipelineConfig,
-    backend: AgentBackend,
+    backend: BackendRouter,
 ) -> PipelineRunResult:
     config.validate()
     problem_inputs = load_problem_inputs(problem_dir)
@@ -107,8 +129,17 @@ def run_pipeline(
 
     loops: list[LoopRecord] = []
     prior_transcript = ""
-    critic_issues: list[CriticIssue] = []
-    council_critics: list[CriticResult] | None = None
+    editor_feedback = "None."
+    feedback_target = ""
+
+    pool_names = sorted(backend.pool_backends)
+    perspective_pairs = [
+        (p.name, p.description) for p in config.reviewer_perspectives
+    ]
+    perspective_names = [p.name for p in config.reviewer_perspectives]
+
+    pool_desc = _build_pool_description(pool_names)
+    persp_desc = _build_perspectives_description(perspective_pairs)
 
     for loop_index in range(1, config.max_loops + 1):
         base_context = _build_context(
@@ -119,59 +150,107 @@ def run_pipeline(
             loop_index=loop_index,
             max_loops=config.max_loops,
             prior_transcript=prior_transcript,
-            critic_issues=critic_issues,
-            council_critics=council_critics,
+            editor_feedback=editor_feedback,
         )
 
+        # --- Statement (always runs) ---
         statement_prompt = render_prompt("statement", base_context)
         statement_text = backend.generate("statement", statement_prompt, base_context)
         ensure_required_sections("statement", statement_text)
 
+        # --- Sketch (runs if first loop or wrong_track) ---
         sketch_context = dict(base_context)
         sketch_context["statement_output"] = statement_text
-        sketch_prompt = render_prompt("sketch", sketch_context)
-        sketch_text = backend.generate("sketch", sketch_prompt, sketch_context)
-        ensure_required_sections("sketch", sketch_text)
+        if feedback_target != "prover":
+            sketch_prompt = render_prompt("sketch", sketch_context)
+            sketch_text = backend.generate("sketch", sketch_prompt, sketch_context)
+            ensure_required_sections("sketch", sketch_text)
+        else:
+            # Reuse last sketch when feedback_target is prover (right_track)
+            sketch_text = loops[-1].sketch_text
 
+        # --- Prover ---
         prover_context = dict(sketch_context)
         prover_context["sketch_output"] = sketch_text
         prover_prompt = render_prompt("prover", prover_context)
         prover_text = backend.generate("prover", prover_prompt, prover_context)
         ensure_required_sections("prover", prover_text)
 
-        critic_base_context = dict(prover_context)
-        critic_base_context["prover_output"] = prover_text
+        # --- Editor dispatch ---
+        dispatch_context = dict(prover_context)
+        dispatch_context["prover_output"] = prover_text
+        dispatch_context["pool_description"] = pool_desc
+        dispatch_context["perspectives_description"] = persp_desc
+        dispatch_prompt = render_prompt("editor_dispatch", dispatch_context)
+        dispatch_text = backend.generate(
+            "editor_dispatch", dispatch_prompt, dispatch_context
+        )
+        editor_dispatch = parse_editor_dispatch_output(
+            dispatch_text, perspective_names, pool_names
+        )
 
-        critic_results: list[CriticResult] = []
-        critic_texts: dict[str, str] = {}
+        # --- Reviewers (one per perspective) ---
+        reviewer_results: list[ReviewerResult] = []
+        reviewer_texts: dict[str, str] = {}
+        for persp in config.reviewer_perspectives:
+            assigned_pool = editor_dispatch.assignments[persp.name]
+            reviewer_context = dict(dispatch_context)
+            reviewer_context["reviewer_name"] = assigned_pool
+            reviewer_context["perspective_name"] = persp.name
+            reviewer_context["perspective_description"] = persp.description
+            reviewer_prompt = render_prompt("reviewer", reviewer_context)
+            reviewer_text = backend.generate_with_pool(
+                assigned_pool, "reviewer", reviewer_prompt, reviewer_context
+            )
+            reviewer_result = parse_reviewer_output(
+                reviewer_text,
+                reviewer_name=assigned_pool,
+                perspective_name=persp.name,
+            )
+            reviewer_results.append(reviewer_result)
+            reviewer_texts[persp.name] = reviewer_text
 
-        for perspective in config.critic_perspectives:
-            critic_context = dict(critic_base_context)
-            critic_context["critic_perspective_name"] = perspective.name
-            critic_context["critic_perspective_description"] = perspective.description
-            critic_prompt = render_prompt("critic", critic_context)
-            critic_text = backend.generate("critic", critic_prompt, critic_context)
-            critic_result = parse_critic_output(critic_text, critic_name=perspective.name)
-            critic_results.append(critic_result)
-            critic_texts[perspective.name] = critic_text
+        # --- Editor decision ---
+        reviews_md = _reviews_to_markdown(reviewer_results)
+        decision_context = dict(dispatch_context)
+        decision_context["reviews_markdown"] = reviews_md
+        decision_prompt = render_prompt("editor_decision", decision_context)
+        decision_text = backend.generate(
+            "editor_decision", decision_prompt, decision_context
+        )
+        verdict, summary, feedback = parse_editor_decision_output(decision_text)
 
-        council = CouncilResult(verdicts=critic_results)
+        if verdict == "accept":
+            feedback_target_str = ""
+        elif verdict == "right_track":
+            feedback_target_str = "prover"
+        else:
+            feedback_target_str = "sketch"
+
+        editor_decision = EditorDecision(
+            verdict=verdict,
+            summary=summary,
+            feedback=feedback,
+            feedback_target=feedback_target_str,
+            reviewer_results=reviewer_results,
+        )
 
         loop = LoopRecord(
             loop_index=loop_index,
             statement_text=statement_text,
             sketch_text=sketch_text,
             prover_text=prover_text,
-            critic_texts=critic_texts,
-            council_result=council,
+            editor_dispatch=editor_dispatch,
+            reviewer_texts=reviewer_texts,
+            editor_decision=editor_decision,
         )
         loops.append(loop)
         prior_transcript += "\n" + _format_loop_for_context(loop)
 
-        if council.overall_verdict == "PASS":
+        if verdict == "accept":
             break
-        critic_issues = council.all_issues
-        council_critics = critic_results
+        editor_feedback = feedback
+        feedback_target = feedback_target_str
 
     finished_dt = utc_now()
     finished_at = finished_dt.isoformat()
@@ -181,7 +260,7 @@ def run_pipeline(
     meta_path = out_dir / f"{timestamp}-meta.json"
     latex_path = out_dir / f"{timestamp}-report.tex"
 
-    final_verdict = loops[-1].council_result.overall_verdict
+    final_verdict: EditorVerdict = loops[-1].editor_decision.verdict
     issue_counts = _aggregate_issue_counts(loops)
     run_result = PipelineRunResult(
         problem_id=problem_inputs.problem_id,
@@ -289,7 +368,7 @@ def _resolve_problem_dir(problem: str) -> Path:
 
 def _resolve_backend(
     config: PipelineConfig, problem_dir: Path
-) -> AgentBackend:
+) -> BackendRouter:
     """Build the appropriate backend: config-file router or legacy single."""
     config_file = find_config_file(
         explicit=config.config_path,
@@ -337,15 +416,22 @@ def main(argv: list[str] | None = None) -> int:
             loop_index=1,
             max_loops=config.max_loops,
             prior_transcript="",
-            critic_issues=[],
+            editor_feedback="None.",
         )
         dry_context["statement_output"] = "<dry-run statement output placeholder>"
         dry_context["sketch_output"] = "<dry-run sketch output placeholder>"
         dry_context["prover_output"] = "<dry-run prover output placeholder>"
-        dry_context["critic_perspective_name"] = "<dry-run perspective>"
-        dry_context["critic_perspective_description"] = "<dry-run description>"
+        dry_context["pool_description"] = "<dry-run pool description>"
+        dry_context["perspectives_description"] = "<dry-run perspectives>"
+        dry_context["reviewer_name"] = "<dry-run reviewer>"
+        dry_context["perspective_name"] = "<dry-run perspective>"
+        dry_context["perspective_description"] = "<dry-run description>"
+        dry_context["reviews_markdown"] = "<dry-run reviews>"
         try:
-            for role in ("statement", "sketch", "prover", "critic"):
+            for role in (
+                "statement", "sketch", "prover",
+                "editor_dispatch", "editor_decision", "reviewer",
+            ):
                 _ = render_prompt(role, dry_context)
         except Exception as exc:
             print(f"[error] Prompt rendering failed: {exc}", file=sys.stderr)
@@ -369,7 +455,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[ok] Transcript: {result.transcript_path}")
     print(f"[ok] LaTeX: {result.latex_path}")
     print(f"[ok] Meta: {result.meta_path}")
-    if result.final_verdict == "PASS":
+    if result.final_verdict == "accept":
         return 0
     return 1
 

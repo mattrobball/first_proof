@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal
 
 Severity = Literal["critical", "major", "minor"]
-Verdict = Literal["PASS", "FAIL"]
+EditorVerdict = Literal["accept", "right_track", "wrong_track"]
 
 
 @dataclass(frozen=True)
@@ -18,13 +18,13 @@ class ProblemInputs:
 
 
 @dataclass(frozen=True)
-class CriticPerspective:
+class ReviewerPerspective:
     name: str
     description: str
 
 
 @dataclass(frozen=True)
-class CriticIssue:
+class ReviewerIssue:
     severity: Severity
     location: str
     reason: str
@@ -42,44 +42,48 @@ class CriticIssue:
 
 
 @dataclass(frozen=True)
-class CriticResult:
-    critic_name: str
-    verdict: Verdict
-    issues: list[CriticIssue]
+class ReviewerResult:
+    reviewer_name: str
+    perspective_name: str
+    issues: list[ReviewerIssue]
     residual_concerns: list[str]
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "critic_name": self.critic_name,
-            "verdict": self.verdict,
+            "reviewer_name": self.reviewer_name,
+            "perspective_name": self.perspective_name,
             "issues": [issue.to_dict() for issue in self.issues],
             "residual_concerns": self.residual_concerns,
         }
 
 
 @dataclass(frozen=True)
-class CouncilResult:
-    """Aggregated result from all critics in the council."""
-
-    verdicts: list[CriticResult]
-
-    @property
-    def overall_verdict(self) -> Verdict:
-        if all(cr.verdict == "PASS" for cr in self.verdicts):
-            return "PASS"
-        return "FAIL"
-
-    @property
-    def all_issues(self) -> list[CriticIssue]:
-        issues: list[CriticIssue] = []
-        for cr in self.verdicts:
-            issues.extend(cr.issues)
-        return issues
+class EditorDispatch:
+    assignments: dict[str, str]
+    reasoning: str
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "overall_verdict": self.overall_verdict,
-            "critics": [cr.to_dict() for cr in self.verdicts],
+            "assignments": self.assignments,
+            "reasoning": self.reasoning,
+        }
+
+
+@dataclass(frozen=True)
+class EditorDecision:
+    verdict: EditorVerdict
+    summary: str
+    feedback: str
+    feedback_target: str
+    reviewer_results: list[ReviewerResult]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "verdict": self.verdict,
+            "summary": self.summary,
+            "feedback": self.feedback,
+            "feedback_target": self.feedback_target,
+            "reviewer_results": [rr.to_dict() for rr in self.reviewer_results],
         }
 
 
@@ -89,8 +93,9 @@ class LoopRecord:
     statement_text: str
     sketch_text: str
     prover_text: str
-    critic_texts: dict[str, str]
-    council_result: CouncilResult
+    editor_dispatch: EditorDispatch
+    reviewer_texts: dict[str, str]
+    editor_decision: EditorDecision
 
 
 @dataclass(frozen=True)
@@ -100,7 +105,7 @@ class PipelineRunResult:
     finished_at: str
     max_loops: int
     executed_loops: int
-    final_verdict: Verdict
+    final_verdict: EditorVerdict
     issue_counts: dict[str, int]
     loops: list[LoopRecord]
     transcript_path: Path
@@ -122,7 +127,7 @@ class PipelineRunResult:
             "loops": [
                 {
                     "loop_index": loop.loop_index,
-                    "council_result": loop.council_result.to_dict(),
+                    "editor_decision": loop.editor_decision.to_dict(),
                 }
                 for loop in self.loops
             ],

@@ -3,6 +3,8 @@
 The :class:`AgentBackend` protocol is the central interface for all backends.
 :class:`BackendRouter` maps each agent *role* to its own backend instance,
 allowing per-agent model selection driven by a TOML configuration file.
+The router also holds a pool of reviewer backends that the editor can
+dispatch to individual perspectives.
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ import re
 import shutil
 import subprocess
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
@@ -31,7 +33,7 @@ class AgentBackend(Protocol):
 
 
 # ---------------------------------------------------------------------------
-# BackendRouter – dispatches per-role
+# BackendRouter – dispatches per-role and per-pool
 # ---------------------------------------------------------------------------
 
 @dataclass
@@ -39,13 +41,27 @@ class BackendRouter:
     """Routes each agent role to its own backend instance.
 
     Implements :class:`AgentBackend` so the runner can use it transparently.
+    Also holds ``pool_backends`` for reviewer dispatch.
     """
 
     role_backends: dict[str, AgentBackend]
     default_backend: AgentBackend
+    pool_backends: dict[str, AgentBackend] = field(default_factory=dict)
 
     def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
         backend = self.role_backends.get(role, self.default_backend)
+        return backend.generate(role, prompt, context)
+
+    def generate_with_pool(
+        self, pool_name: str, role: str, prompt: str, context: dict[str, str]
+    ) -> str:
+        """Generate using a named pool backend."""
+        if pool_name not in self.pool_backends:
+            raise ValueError(
+                f"Unknown pool backend: '{pool_name}'. "
+                f"Available: {sorted(self.pool_backends)}"
+            )
+        backend = self.pool_backends[pool_name]
         return backend.generate(role, prompt, context)
 
 
@@ -68,7 +84,7 @@ class DemoBackend:
     def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
         loop_index = int(context.get("loop_index", "1"))
         question_line = _first_non_empty_line(context.get("question_text", ""))
-        issues_md = context.get("critic_issues_markdown", "None.")
+        editor_feedback = context.get("editor_feedback", "None.")
 
         if role == "statement":
             return (
@@ -97,7 +113,7 @@ class DemoBackend:
                 "## Dependency Graph\n"
                 "Lemma A -> Lemma B -> Lemma C -> Main theorem.\n\n"
                 "## Risky Steps\n"
-                f"- Items to watch from critic: {issues_md}\n"
+                f"- Items to watch from editor: {editor_feedback}\n"
             )
 
         if role == "prover":
@@ -110,14 +126,34 @@ class DemoBackend:
                 "- Lemma B: derived from Lemma A and background constraints.\n"
                 "- Lemma C: follows from Lemma B and the target implication form.\n\n"
                 "## Gap Closure Notes\n"
-                f"Addressed critic issues this loop: {issues_md}\n"
+                f"Addressed editor feedback this loop: {editor_feedback}\n"
             )
 
-        if role == "critic":
-            perspective = context.get("critic_perspective_name", "General")
+        if role == "editor_dispatch":
+            # Assign all perspectives to the first available pool reviewer
+            pool_desc = context.get("pool_description", "")
+            persp_desc = context.get("perspectives_description", "")
+            # Parse pool names from pool_description
+            pool_names = re.findall(r"- \*\*(\S+)\*\*", pool_desc)
+            pool_name = pool_names[0] if pool_names else "default_reviewer"
+            # Parse perspective names from perspectives_description
+            persp_names = re.findall(r"\d+\.\s+\*\*(.+?)\*\*", persp_desc)
+            assignments = {p: pool_name for p in persp_names}
+            payload = {
+                "assignments": assignments,
+                "reasoning": "Demo: assigning all perspectives to the first pool reviewer.",
+            }
+            return (
+                "## Editor Dispatch\n"
+                "Assigning all perspectives to the primary reviewer.\n\n"
+                "## Assignments\n"
+                f"```json\n{json.dumps(payload, indent=2)}\n```\n"
+            )
+
+        if role == "reviewer":
+            perspective = context.get("perspective_name", "General")
             if loop_index == 1:
                 payload = {
-                    "verdict": "FAIL",
                     "issues": [
                         {
                             "severity": "major",
@@ -135,21 +171,46 @@ class DemoBackend:
                     ],
                 }
                 return (
-                    f"## {perspective} Critic — Verdict\n"
-                    "FAIL\n\n"
-                    "## Issues\n"
-                    "1. [major] Complete Proof: missing detailed derivation for Lemma B.\n\n"
-                    "## Structured Verdict\n"
+                    f"## {perspective} Review\n"
+                    "Issues found.\n\n"
+                    "## Structured Review\n"
                     f"```json\n{json.dumps(payload, indent=2)}\n```\n"
                 )
 
-            payload = {"verdict": "PASS", "issues": [], "residual_concerns": []}
+            payload = {"issues": [], "residual_concerns": []}
             return (
-                f"## {perspective} Critic — Verdict\n"
-                "PASS\n\n"
-                "## Issues\n"
-                "None.\n\n"
-                "## Structured Verdict\n"
+                f"## {perspective} Review\n"
+                "No issues.\n\n"
+                "## Structured Review\n"
+                f"```json\n{json.dumps(payload, indent=2)}\n```\n"
+            )
+
+        if role == "editor_decision":
+            if loop_index == 1:
+                payload = {
+                    "verdict": "right_track",
+                    "summary": "The proof has the right approach but Lemma B needs a detailed derivation.",
+                    "feedback": (
+                        "Provide a stepwise derivation for Lemma B. "
+                        "Break it into sub-claims and prove each from stated assumptions."
+                    ),
+                }
+                return (
+                    "## Editor Decision\n"
+                    "The proof needs revisions.\n\n"
+                    "## Verdict\n"
+                    f"```json\n{json.dumps(payload, indent=2)}\n```\n"
+                )
+
+            payload = {
+                "verdict": "accept",
+                "summary": "All reviewers are satisfied. The proof is correct and complete.",
+                "feedback": "",
+            }
+            return (
+                "## Editor Decision\n"
+                "The proof is accepted.\n\n"
+                "## Verdict\n"
                 f"```json\n{json.dumps(payload, indent=2)}\n```\n"
             )
 
@@ -313,13 +374,23 @@ def build_backend_from_config(
     """Create a :class:`BackendRouter` from a parsed TOML config.
 
     Each agent role defined in ``[agents.<role>]`` gets its own backend; all
-    other roles fall back to ``[defaults]``.
+    other roles fall back to ``[defaults]``.  Reviewer pool entries become
+    ``pool_backends``.
     """
     default_backend = _build_single_backend(file_config.defaults, workdir)
     role_backends: dict[str, AgentBackend] = {}
     for role, cfg in file_config.agents.items():
         role_backends[role] = _build_single_backend(cfg, workdir)
-    return BackendRouter(role_backends=role_backends, default_backend=default_backend)
+
+    pool_backends: dict[str, AgentBackend] = {}
+    for pool_name, cfg in file_config.reviewer_pool.items():
+        pool_backends[pool_name] = _build_single_backend(cfg, workdir)
+
+    return BackendRouter(
+        role_backends=role_backends,
+        default_backend=default_backend,
+        pool_backends=pool_backends,
+    )
 
 
 def build_backend(
@@ -327,17 +398,27 @@ def build_backend(
     model: str | None,
     seed: int | None = None,
     workdir: Path | None = None,
-) -> AgentBackend:
+) -> BackendRouter:
     """Legacy factory used by the ``--backend`` CLI flag.
 
-    Retained for backward compatibility.  Prefer ``build_backend_from_config``
-    for new code.
+    Retained for backward compatibility.  Returns a :class:`BackendRouter`
+    with a ``"default_reviewer"`` pool entry so the editor flow works.
     """
     normalized = name.strip().lower()
     if normalized == "demo":
-        return DemoBackend()
+        demo = DemoBackend()
+        return BackendRouter(
+            role_backends={},
+            default_backend=demo,
+            pool_backends={"default_reviewer": demo},
+        )
     if normalized in {"codex", "codex-cli"}:
         if seed is not None:
             _ = seed
-        return CodexCLIBackend(model=model, workdir=workdir)
+        backend = CodexCLIBackend(model=model, workdir=workdir)
+        return BackendRouter(
+            role_backends={},
+            default_backend=backend,
+            pool_backends={"default_reviewer": backend},
+        )
     raise ValueError(f"Unsupported legacy backend: {name}")

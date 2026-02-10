@@ -11,12 +11,12 @@ Statement:
 Sketch:
 {sketch_output}
 
-Outstanding critic issues to fix:
-{critic_issues_markdown}
+Editor feedback to address:
+{editor_feedback}
 
 Task:
 1. Write a complete proof and prove all introduced lemmas.
-2. Explicitly close each outstanding critic issue.
+2. Explicitly address each point in the editor feedback.
 3. Use only assumptions from statement/background unless explicitly justified.
 
 Output requirements:

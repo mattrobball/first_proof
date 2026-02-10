@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 
-from .models import CriticIssue, CriticResult, Severity, Verdict
+from .models import EditorDispatch, EditorVerdict, ReviewerIssue, ReviewerResult, Severity
 
 REQUIRED_HEADINGS: dict[str, list[str]] = {
     "statement": [
@@ -26,7 +26,7 @@ REQUIRED_HEADINGS: dict[str, list[str]] = {
 }
 
 VALID_SEVERITIES: set[str] = {"critical", "major", "minor"}
-VALID_VERDICTS: set[str] = {"PASS", "FAIL"}
+VALID_EDITOR_VERDICTS: set[str] = {"accept", "right_track", "wrong_track"}
 
 
 class OutputValidationError(ValueError):
@@ -46,32 +46,34 @@ def ensure_required_sections(role: str, text: str) -> None:
         )
 
 
-def parse_critic_output(text: str, critic_name: str = "") -> CriticResult:
+def _extract_json_block(text: str, label: str) -> dict:
+    """Extract and parse a fenced JSON block from *text*."""
     match = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
     if not match:
-        raise OutputValidationError("Critic output missing fenced JSON payload")
-
+        raise OutputValidationError(f"{label} output missing fenced JSON payload")
     try:
-        payload = json.loads(match.group(1))
+        return json.loads(match.group(1))
     except json.JSONDecodeError as exc:
-        raise OutputValidationError("Critic JSON payload is invalid") from exc
+        raise OutputValidationError(f"{label} JSON payload is invalid") from exc
 
-    verdict = payload.get("verdict")
-    if verdict not in VALID_VERDICTS:
-        raise OutputValidationError("Critic verdict must be PASS or FAIL")
+
+def parse_reviewer_output(
+    text: str, reviewer_name: str = "", perspective_name: str = ""
+) -> ReviewerResult:
+    payload = _extract_json_block(text, "Reviewer")
 
     issues_raw = payload.get("issues")
     if not isinstance(issues_raw, list):
-        raise OutputValidationError("Critic issues must be a list")
+        raise OutputValidationError("Reviewer issues must be a list")
 
     residual = payload.get("residual_concerns", [])
     if not isinstance(residual, list) or not all(isinstance(x, str) for x in residual):
-        raise OutputValidationError("Critic residual_concerns must be a list of strings")
+        raise OutputValidationError("Reviewer residual_concerns must be a list of strings")
 
-    issues: list[CriticIssue] = []
+    issues: list[ReviewerIssue] = []
     for idx, issue_obj in enumerate(issues_raw, start=1):
         if not isinstance(issue_obj, dict):
-            raise OutputValidationError(f"Critic issue #{idx} must be an object")
+            raise OutputValidationError(f"Reviewer issue #{idx} must be an object")
 
         severity = issue_obj.get("severity")
         location = issue_obj.get("location")
@@ -81,24 +83,24 @@ def parse_critic_output(text: str, critic_name: str = "") -> CriticResult:
 
         if severity not in VALID_SEVERITIES:
             raise OutputValidationError(
-                f"Critic issue #{idx} severity must be one of {sorted(VALID_SEVERITIES)}"
+                f"Reviewer issue #{idx} severity must be one of {sorted(VALID_SEVERITIES)}"
             )
         if not isinstance(location, str) or not location.strip():
-            raise OutputValidationError(f"Critic issue #{idx} location must be non-empty")
+            raise OutputValidationError(f"Reviewer issue #{idx} location must be non-empty")
         if not isinstance(reason, str) or not reason.strip():
-            raise OutputValidationError(f"Critic issue #{idx} reason must be non-empty")
+            raise OutputValidationError(f"Reviewer issue #{idx} reason must be non-empty")
         if not isinstance(required_fix, str) or not required_fix.strip():
             raise OutputValidationError(
-                f"Critic issue #{idx} required_fix must be non-empty"
+                f"Reviewer issue #{idx} required_fix must be non-empty"
             )
         if not isinstance(suggestion, str) or not suggestion.strip():
             raise OutputValidationError(
-                f"Critic issue #{idx} suggestion must be non-empty"
+                f"Reviewer issue #{idx} suggestion must be non-empty"
             )
 
         typed_severity: Severity = severity
         issues.append(
-            CriticIssue(
+            ReviewerIssue(
                 severity=typed_severity,
                 location=location.strip(),
                 reason=reason.strip(),
@@ -107,15 +109,79 @@ def parse_critic_output(text: str, critic_name: str = "") -> CriticResult:
             )
         )
 
-    typed_verdict: Verdict = verdict
-    if typed_verdict == "PASS" and issues:
-        raise OutputValidationError("Critic cannot return PASS with non-empty issues")
-    if typed_verdict == "FAIL" and not issues:
-        raise OutputValidationError("Critic cannot return FAIL with empty issues")
-
-    return CriticResult(
-        critic_name=critic_name,
-        verdict=typed_verdict,
+    return ReviewerResult(
+        reviewer_name=reviewer_name,
+        perspective_name=perspective_name,
         issues=issues,
         residual_concerns=residual,
     )
+
+
+def parse_editor_dispatch_output(
+    text: str,
+    available_perspectives: list[str],
+    available_pool_names: list[str],
+) -> EditorDispatch:
+    payload = _extract_json_block(text, "Editor dispatch")
+
+    assignments = payload.get("assignments")
+    if not isinstance(assignments, dict):
+        raise OutputValidationError("Editor dispatch assignments must be an object")
+
+    reasoning = payload.get("reasoning", "")
+    if not isinstance(reasoning, str):
+        raise OutputValidationError("Editor dispatch reasoning must be a string")
+
+    # Validate every perspective is assigned
+    for perspective in available_perspectives:
+        if perspective not in assignments:
+            raise OutputValidationError(
+                f"Editor dispatch missing assignment for perspective: '{perspective}'"
+            )
+
+    # Validate every assigned pool name exists
+    for perspective, pool_name in assignments.items():
+        if not isinstance(pool_name, str):
+            raise OutputValidationError(
+                f"Editor dispatch assignment for '{perspective}' must be a string"
+            )
+        if pool_name not in available_pool_names:
+            raise OutputValidationError(
+                f"Editor dispatch assigned unknown pool name '{pool_name}' "
+                f"to perspective '{perspective}'. "
+                f"Available: {sorted(available_pool_names)}"
+            )
+
+    return EditorDispatch(assignments=assignments, reasoning=reasoning)
+
+
+def parse_editor_decision_output(
+    text: str,
+) -> tuple[EditorVerdict, str, str]:
+    payload = _extract_json_block(text, "Editor decision")
+
+    verdict = payload.get("verdict")
+    if verdict not in VALID_EDITOR_VERDICTS:
+        raise OutputValidationError(
+            f"Editor decision verdict must be one of {sorted(VALID_EDITOR_VERDICTS)}"
+        )
+
+    summary = payload.get("summary", "")
+    if not isinstance(summary, str):
+        raise OutputValidationError("Editor decision summary must be a string")
+
+    feedback = payload.get("feedback", "")
+    if not isinstance(feedback, str):
+        raise OutputValidationError("Editor decision feedback must be a string")
+
+    if verdict == "accept" and feedback:
+        raise OutputValidationError(
+            "Editor decision with 'accept' verdict must have empty feedback"
+        )
+    if verdict != "accept" and not feedback.strip():
+        raise OutputValidationError(
+            f"Editor decision with '{verdict}' verdict must have non-empty feedback"
+        )
+
+    typed_verdict: EditorVerdict = verdict
+    return typed_verdict, summary, feedback

@@ -37,6 +37,7 @@ model    = "test-model"
     assert fc.defaults.provider == "anthropic"
     assert fc.defaults.model == "test-model"
     assert fc.agents == {}
+    assert fc.reviewer_pool == {}
 
 
 def test_load_config_with_per_agent_overrides(tmp_path: Path) -> None:
@@ -53,7 +54,7 @@ model    = "claude-base"
 provider = "openai"
 model    = "gpt-4o"
 
-[agents.critic]
+[agents.editor]
 backend     = "cli"
 provider    = "claude"
 """,
@@ -70,10 +71,10 @@ provider    = "claude"
     assert prover.provider == "openai"
     assert prover.model == "gpt-4o"
 
-    # critic overrides backend to cli
-    critic = fc.resolve("critic")
-    assert critic.backend == "cli"
-    assert critic.provider == "claude"
+    # editor overrides backend to cli
+    editor = fc.resolve("editor")
+    assert editor.backend == "cli"
+    assert editor.provider == "claude"
 
     # statement falls back to defaults
     statement = fc.resolve("statement")
@@ -102,6 +103,77 @@ temperature = 0.0
     sketch = fc.resolve("sketch")
     assert sketch.temperature == 0.0
     assert sketch.timeout == 300  # inherited
+
+
+def test_load_config_with_reviewer_pool(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "pipeline.toml"
+    _write(
+        cfg_path,
+        """\
+[defaults]
+backend  = "demo"
+provider = "anthropic"
+
+[reviewer_pool.claude_reviewer]
+backend  = "api"
+provider = "anthropic"
+model    = "claude-sonnet-4-20250514"
+
+[reviewer_pool.gpt_reviewer]
+backend  = "api"
+provider = "openai"
+model    = "gpt-4o"
+""",
+    )
+    fc = load_config_file(cfg_path)
+    assert "claude_reviewer" in fc.reviewer_pool
+    assert "gpt_reviewer" in fc.reviewer_pool
+    assert fc.reviewer_pool["claude_reviewer"].provider == "anthropic"
+    assert fc.reviewer_pool["gpt_reviewer"].provider == "openai"
+    assert fc.reviewer_pool["gpt_reviewer"].model == "gpt-4o"
+
+
+def test_reviewer_pool_inherits_defaults(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "pipeline.toml"
+    _write(
+        cfg_path,
+        """\
+[defaults]
+backend     = "api"
+provider    = "anthropic"
+temperature = 0.3
+
+[reviewer_pool.my_reviewer]
+model = "custom-model"
+""",
+    )
+    fc = load_config_file(cfg_path)
+    reviewer = fc.reviewer_pool["my_reviewer"]
+    assert reviewer.backend == "api"
+    assert reviewer.provider == "anthropic"
+    assert reviewer.temperature == 0.3
+    assert reviewer.model == "custom-model"
+
+
+def test_resolve_reviewer_found() -> None:
+    pool = {"reviewer_a": AgentModelConfig(backend="demo")}
+    fc = PipelineFileConfig(
+        defaults=AgentModelConfig(backend="demo"),
+        agents={},
+        reviewer_pool=pool,
+    )
+    cfg = fc.resolve_reviewer("reviewer_a")
+    assert cfg.backend == "demo"
+
+
+def test_resolve_reviewer_unknown_raises() -> None:
+    fc = PipelineFileConfig(
+        defaults=AgentModelConfig(backend="demo"),
+        agents={},
+        reviewer_pool={},
+    )
+    with pytest.raises(ValueError, match="Unknown reviewer pool name"):
+        fc.resolve_reviewer("nonexistent")
 
 
 # ---------------------------------------------------------------------------
