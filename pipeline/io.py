@@ -163,7 +163,6 @@ def build_transcript(
     started_at: str,
     finished_at: str,
     final_verdict: str,
-    researcher_text: str = "",
 ) -> str:
     lines: list[str] = []
     lines.append("# Proof Pipeline Transcript")
@@ -178,14 +177,12 @@ def build_transcript(
     lines.append(f"- Final verdict: `{final_verdict}`")
     lines.append("")
 
-    if researcher_text:
-        lines.append("## Researcher")
-        lines.append("")
-        lines.append(researcher_text.rstrip())
-        lines.append("")
-
     for loop in loops:
         lines.append(f"## Loop {loop.loop_index}")
+        lines.append("")
+        lines.append("### Researcher Agent")
+        lines.append("")
+        lines.append(loop.researcher_text.rstrip())
         lines.append("")
         lines.append("### Mentor Agent")
         lines.append("")
@@ -359,7 +356,6 @@ def build_latex(
     started_at: str,
     finished_at: str,
     final_verdict: str,
-    researcher_text: str = "",
 ) -> str:
     """Generate a self-contained LaTeX document from pipeline results."""
     verdict_color = _VERDICT_COLORS.get(final_verdict, "black")
@@ -432,14 +428,6 @@ def build_latex(
         )
     summary_body += r"\end{enumerate}" "\n\n"
 
-    # --- Researcher section ---
-    researcher_section = ""
-    if researcher_text:
-        researcher_section = (
-            r"\section{Researcher Background}" "\n"
-            + _md_to_latex_body(researcher_text) + "\n\n"
-        )
-
     # --- Per-loop sections ---
     loop_sections = ""
     for loop in loops:
@@ -450,6 +438,10 @@ def build_latex(
             r"\noindent Editor verdict for this loop: "
             r"\textcolor{" + v_color + r"}{\textbf{" + decision.verdict + r"}}" "\n\n"
         )
+
+        # Researcher
+        loop_sections += r"\subsection{Researcher}" "\n"
+        loop_sections += _md_to_latex_body(loop.researcher_text) + "\n\n"
 
         # Mentor
         loop_sections += r"\subsection{Mentor}" "\n"
@@ -539,7 +531,7 @@ def build_latex(
 
     closing = r"\end{document}" "\n"
 
-    return preamble + "\n" + summary_body + researcher_section + loop_sections + final_section + closing
+    return preamble + "\n" + summary_body + loop_sections + final_section + closing
 
 
 def write_text(path: Path, text: str) -> None:

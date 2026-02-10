@@ -4,21 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+All commands use the project virtualenv at `.venv/`. Use `.venv/bin/python` (there is no system `python`).
+
 ```bash
 # Run tests
-python -m pytest -q
+.venv/bin/python -m pytest -q
 
 # Run a single test file
-python -m pytest tests/test_runner.py -q
+.venv/bin/python -m pytest tests/test_runner.py -q
 
 # Run pipeline with demo backend (no API keys needed)
-python -m pipeline.runner --problem 5 --backend demo
+.venv/bin/python -m pipeline.runner --problem 5 --backend demo
 
 # Run pipeline with TOML config (auto-discovered)
-python -m pipeline.runner --problem 5
+.venv/bin/python -m pipeline.runner --problem 5
 
 # Dry-run (validate prompts only, no backend calls)
-python -m pipeline.runner --problem 5 --dry-run
+.venv/bin/python -m pipeline.runner --problem 5 --dry-run
 ```
 
 ## Architecture
@@ -27,10 +29,9 @@ This is a multi-agent proof pipeline that iteratively generates and validates ma
 
 ### Pipeline Flow
 
-0. **Researcher** (once, pre-loop) — Gathers relevant theorems, definitions, proof strategies, and identifies gaps in the background material. Output is passed to all loop agents as `{researcher_output}`.
-
 #### Per-Loop Flow
 
+0. **Researcher** — Gathers relevant theorems, definitions, proof strategies, and identifies gaps. Runs every loop with access to prior transcript and editor feedback so it can refine research. Output is passed to subsequent agents as `{researcher_output}`.
 1. **Mentor** — Formalizes the problem, normalizes notation, and proposes lemma-level proof strategy (skipped on `right_track` feedback)
 2. **Prover** — Writes complete proof with justified steps
 3. **Editor Dispatch** — Assigns pool reviewers to perspectives (LLM call)

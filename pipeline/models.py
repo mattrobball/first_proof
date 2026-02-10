@@ -90,6 +90,7 @@ class EditorDecision:
 @dataclass(frozen=True)
 class LoopRecord:
     loop_index: int
+    researcher_text: str
     mentor_text: str
     prover_text: str
     editor_dispatch: EditorDispatch
