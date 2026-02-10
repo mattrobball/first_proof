@@ -72,6 +72,8 @@ def _build_perspectives_description(
 def _format_loop_for_context(loop: LoopRecord) -> str:
     parts = [
         f"## Loop {loop.loop_index}\n"
+        "### Researcher\n"
+        f"{loop.researcher_text.strip()}\n"
         "### Mentor\n"
         f"{loop.mentor_text.strip()}\n"
         "### Prover\n"
@@ -157,21 +159,7 @@ def run_pipeline(
     pool_desc = _build_pool_description(pool_names)
     persp_desc = _build_perspectives_description(perspective_pairs)
 
-    # --- Researcher (once, pre-loop) ---
-    researcher_pick = backend.pick_role("researcher")
-    if researcher_pick:
-        _status(f"researcher -> {researcher_pick}")
-    _status("researcher ...")
-    researcher_context = {
-        "problem_id": problem_inputs.problem_id,
-        "question_text": problem_inputs.question_text,
-        "background_text": problem_inputs.background_text,
-        "rigor": config.rigor,
-    }
-    researcher_prompt = render_prompt("researcher", researcher_context)
-    researcher_text = backend.generate("researcher", researcher_prompt, researcher_context)
-    ensure_required_sections("researcher", researcher_text)
-    _status("researcher done")
+    researcher_text = ""
 
     for loop_index in range(1, config.max_loops + 1):
         _log_shuffle(backend.shuffle(), f"loop {loop_index}")
@@ -186,6 +174,16 @@ def run_pipeline(
             editor_feedback=editor_feedback,
             researcher_output=researcher_text,
         )
+
+        # --- Researcher ---
+        researcher_pick = backend.pick_role("researcher")
+        if researcher_pick:
+            _status(f"researcher -> {researcher_pick}")
+        _status(f"[loop {loop_index}/{config.max_loops}] researcher ...")
+        researcher_prompt = render_prompt("researcher", base_context)
+        researcher_text = backend.generate("researcher", researcher_prompt, base_context)
+        ensure_required_sections("researcher", researcher_text)
+        base_context["researcher_output"] = researcher_text
 
         # --- Mentor (runs if first loop or wrong_track) ---
         if feedback_target != "prover":
@@ -290,6 +288,7 @@ def run_pipeline(
 
         loop = LoopRecord(
             loop_index=loop_index,
+            researcher_text=researcher_text,
             mentor_text=mentor_text,
             prover_text=prover_text,
             editor_dispatch=editor_dispatch,
@@ -322,7 +321,7 @@ def run_pipeline(
         executed_loops=len(loops),
         final_verdict=final_verdict,
         issue_counts=issue_counts,
-        researcher_text=researcher_text,
+        researcher_text=loops[-1].researcher_text,
         loops=loops,
         transcript_path=transcript_path,
         meta_path=meta_path,
@@ -336,7 +335,6 @@ def run_pipeline(
         started_at=started_at,
         finished_at=finished_at,
         final_verdict=final_verdict,
-        researcher_text=researcher_text,
     )
     write_text(transcript_path, transcript_text)
 
@@ -347,7 +345,6 @@ def run_pipeline(
         started_at=started_at,
         finished_at=finished_at,
         final_verdict=final_verdict,
-        researcher_text=researcher_text,
     )
     write_text(latex_path, latex_text)
 

@@ -368,26 +368,29 @@ def test_researcher_text_populated(tmp_path: Path) -> None:
     assert "## Key Definitions" in result.researcher_text
     assert "## Proof Strategies" in result.researcher_text
     assert "## Gaps and Concerns" in result.researcher_text
+    # Also check per-loop researcher_text
+    assert result.loops[0].researcher_text
+    assert "## Relevant Theorems" in result.loops[0].researcher_text
 
 
 def test_researcher_in_transcript(tmp_path: Path) -> None:
-    """The transcript should include a Researcher section."""
+    """The transcript should include a Researcher Agent section inside each loop."""
     problem_dir = _prepare_problem_dir(tmp_path)
     config = PipelineConfig(max_loops=2, out_dir_name="runs")
     result = run_pipeline(problem_dir, config, _make_router())
 
     transcript = result.transcript_path.read_text(encoding="utf-8")
-    assert "## Researcher" in transcript
+    assert "### Researcher Agent" in transcript
 
 
 def test_researcher_in_latex(tmp_path: Path) -> None:
-    """The LaTeX output should include a Researcher Background section."""
+    """The LaTeX output should include a Researcher subsection inside each loop."""
     problem_dir = _prepare_problem_dir(tmp_path)
     config = PipelineConfig(max_loops=2, out_dir_name="runs")
     result = run_pipeline(problem_dir, config, _make_router())
 
     latex = result.latex_path.read_text(encoding="utf-8")
-    assert "Researcher Background" in latex
+    assert r"\subsection{Researcher}" in latex
 
 
 def test_researcher_in_meta(tmp_path: Path) -> None:

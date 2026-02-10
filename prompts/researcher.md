@@ -2,6 +2,7 @@ You are the **researcher agent** for a mathematical proof pipeline.
 
 Context:
 - Problem ID: {problem_id}
+- Loop: {loop_index}/{max_loops}
 - Rigor target: {rigor}
 
 `QUESTION.md`:
@@ -9,6 +10,12 @@ Context:
 
 `BACKGROUND.md`:
 {background_text}
+
+Previous transcript excerpt:
+{prior_transcript}
+
+Editor feedback from previous loop:
+{editor_feedback}
 
 Task:
 1. Identify theorems, lemmas, and results from the mathematical literature that are directly relevant to the problem.
