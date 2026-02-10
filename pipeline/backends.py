@@ -552,29 +552,27 @@ def build_backend_from_config(
     assignments: dict[str, str] = {}
 
     if file_config.randomize_agents:
-        # Build named pool: defaults + reviewer_pool entries, excluding
-        # reviewer-only backends that cannot serve non-reviewer roles.
-        named_configs: dict[str, AgentModelConfig] = {
-            "defaults": file_config.defaults,
+        # Draw only from reviewer_pool entries, excluding reviewer-only
+        # backends that cannot serve non-reviewer roles.
+        eligible: dict[str, AgentBackend] = {
+            pn: pool_backends[pn]
+            for pn, cfg in file_config.reviewer_pool.items()
+            if cfg.backend.lower() not in _REVIEWER_ONLY_BACKENDS
         }
-        for pn, cfg in file_config.reviewer_pool.items():
-            if cfg.backend.lower() not in _REVIEWER_ONLY_BACKENDS:
-                named_configs[pn] = cfg
-        pool_names = sorted(named_configs)
+        if not eligible:
+            raise ValueError(
+                "randomize_agents is enabled but no eligible pool backends "
+                "found (reviewer-only backends are excluded)"
+            )
+        pool_names = sorted(eligible)
         rng = random.Random(seed)
-
-        # Pre-build backends for each named config (reuse existing where possible)
-        named_backends: dict[str, AgentBackend] = {"defaults": default_backend}
-        for pn in file_config.reviewer_pool:
-            if pn in named_configs:
-                named_backends[pn] = pool_backends[pn]
 
         for role in _NON_REVIEWER_ROLES:
             if role in file_config.agents:
                 continue  # explicit override takes precedence
             chosen = rng.choice(pool_names)
             assignments[role] = chosen
-            role_backends[role] = named_backends[chosen]
+            role_backends[role] = eligible[chosen]
 
     return (
         BackendRouter(

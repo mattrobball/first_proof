@@ -1,19 +1,13 @@
 randomize_agents = true
 required_reviewers = ["self_citer", "extension_requester"]
 
-[defaults]
-backend  = "cli"
-provider = "codex"
-model    = "gpt-5.3-codex"
-reasoning_effort = "xhigh"
-
-[reviewer_pool.claude_reviewer]
+[reviewer_pool.claude_code]
 backend  = "cli"
 provider = "claude"
 model    = "claude-opus-4-6"
 reasoning_effort = "high"
 
-[reviewer_pool.codex_reviewer]
+[reviewer_pool.codex_cli]
 backend  = "cli"
 provider = "codex"
 model    = "gpt-5.3-codex"

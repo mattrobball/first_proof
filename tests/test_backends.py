@@ -134,7 +134,8 @@ def test_randomize_assigns_all_roles() -> None:
     _router, assignments = build_backend_from_config(fc, seed=42)
     expected_roles = {"researcher", "mentor", "prover", "editor_dispatch", "editor_decision"}
     assert set(assignments) == expected_roles
-    valid_pool_names = {"defaults", "reviewer_a", "reviewer_b"}
+    # Only pool entries are eligible — "defaults" is never selected
+    valid_pool_names = {"reviewer_a", "reviewer_b"}
     for pool_name in assignments.values():
         assert pool_name in valid_pool_names
 

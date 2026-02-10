@@ -308,9 +308,21 @@ def test_load_pipeline_toml() -> None:
     """The real pipeline.toml at the project root parses without error."""
     root = Path(__file__).resolve().parent.parent / "pipeline.toml"
     fc = load_config_file(root)
-    assert fc.defaults.backend == "cli"
-    assert fc.defaults.provider == "codex"
+    # No [defaults] section — defaults synthesised from first pool entry
+    assert fc.defaults.backend in ("cli", "api", "self_citer", "extension_requester")
     assert len(fc.reviewer_pool) >= 3
+
+
+def test_no_defaults_uses_first_pool_entry(tmp_path: Path) -> None:
+    """When [defaults] is absent, defaults come from first pool entry."""
+    cfg_path = tmp_path / "pipeline.toml"
+    cfg_path.write_text(
+        '[reviewer_pool.my_backend]\nbackend = "demo"\nprovider = "test"\nmodel = "m1"\n',
+        encoding="utf-8",
+    )
+    fc = load_config_file(cfg_path)
+    assert fc.defaults.backend == "demo"
+    assert fc.defaults.provider == "test"
 
 
 # ---------------------------------------------------------------------------
@@ -320,18 +332,24 @@ def test_load_pipeline_toml() -> None:
 
 def _approved_config(**pool_overrides: dict) -> PipelineFileConfig:
     """Build a PipelineFileConfig using only approved backends."""
+    pool = {
+        "claude_code": AgentModelConfig(
+            backend="cli", provider="claude", model="claude-opus-4-6",
+        ),
+        "codex_cli": AgentModelConfig(
+            backend="cli", provider="codex", model="gpt-5.3-codex",
+        ),
+        "gemini_reviewer": AgentModelConfig(
+            backend="api", provider="gemini", model="gemini-3-pro-preview",
+        ),
+        **pool_overrides,
+    }
+    # Defaults from first pool entry (mirrors no-[defaults] behaviour)
+    defaults = next(iter(pool.values()))
     return PipelineFileConfig(
-        defaults=AgentModelConfig(backend="cli", provider="codex", model="gpt-5.3-codex"),
+        defaults=defaults,
         agents={},
-        reviewer_pool={
-            "claude_reviewer": AgentModelConfig(
-                backend="cli", provider="claude", model="claude-opus-4-6",
-            ),
-            "gemini_reviewer": AgentModelConfig(
-                backend="api", provider="gemini", model="gemini-3-pro-preview",
-            ),
-            **pool_overrides,
-        },
+        reviewer_pool=pool,
     )
 
 

@@ -169,20 +169,32 @@ def _raw_to_agent_config(
 
 
 def load_config_file(path: Path) -> PipelineFileConfig:
-    """Parse a ``pipeline.toml`` file into a :class:`PipelineFileConfig`."""
+    """Parse a ``pipeline.toml`` file into a :class:`PipelineFileConfig`.
+
+    If no ``[defaults]`` section is present, defaults are synthesised from
+    the first ``[reviewer_pool.*]`` entry (or a bare ``AgentModelConfig``
+    if the pool is also empty).
+    """
     raw = path.read_text(encoding="utf-8")
     data = tomllib.loads(raw)
 
     defaults_raw: dict[str, Any] = dict(data.get("defaults", {}))
-    defaults = _raw_to_agent_config({}, defaults_raw)
-
-    agents: dict[str, AgentModelConfig] = {}
-    for role, role_raw in data.get("agents", {}).items():
-        agents[role] = _raw_to_agent_config(defaults_raw, role_raw)
 
     reviewer_pool: dict[str, AgentModelConfig] = {}
     for pool_name, pool_raw in data.get("reviewer_pool", {}).items():
         reviewer_pool[pool_name] = _raw_to_agent_config(defaults_raw, pool_raw)
+
+    # When no [defaults] section exists, fall back to first pool entry.
+    if "defaults" in data:
+        defaults = _raw_to_agent_config({}, defaults_raw)
+    elif reviewer_pool:
+        defaults = next(iter(reviewer_pool.values()))
+    else:
+        defaults = AgentModelConfig()
+
+    agents: dict[str, AgentModelConfig] = {}
+    for role, role_raw in data.get("agents", {}).items():
+        agents[role] = _raw_to_agent_config(defaults_raw, role_raw)
 
     randomize_agents = bool(data.get("randomize_agents", False))
     required_reviewers = list(data.get("required_reviewers", []))
