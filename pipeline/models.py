@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal
 
 Severity = Literal["critical", "major", "minor"]
-EditorVerdict = Literal["accept", "right_track", "wrong_track"]
+EditorVerdict = Literal["accept", "right_track", "wrong_track", "reject"]
 
 
 @dataclass(frozen=True)

@@ -30,7 +30,7 @@ REQUIRED_HEADINGS: dict[str, list[str]] = {
 }
 
 VALID_SEVERITIES: set[str] = {"critical", "major", "minor"}
-VALID_EDITOR_VERDICTS: set[str] = {"accept", "right_track", "wrong_track"}
+VALID_EDITOR_VERDICTS: set[str] = {"accept", "right_track", "wrong_track", "reject"}
 
 
 class OutputValidationError(ValueError):

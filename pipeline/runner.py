@@ -86,6 +86,70 @@ def _format_loop_for_context(loop: LoopRecord) -> str:
     return "".join(parts)
 
 
+_JOKE_REVIEWER_LINES: dict[str, str] = {
+    "self_citer": (
+        "has submitted what appears to be an annotated bibliography of "
+        "their own collected works, tangentially organized around the "
+        "pretense of evaluating the proof. They cite themselves no fewer "
+        "than fourteen times. They engage with the actual mathematics "
+        "zero times. They have also, remarkably, suggested we add them "
+        "as a co-author."
+    ),
+    "extension_requester": (
+        "has — after a delay that I can only describe as geological — "
+        "informed me that they managed to read the title and part of "
+        "the abstract before being called away by a departmental "
+        "retreat, two grant deadlines, a child's school play, and "
+        "(I am not making this up) 'a particularly engrossing season "
+        "of television.' They request six to eight additional months, "
+        "contingent on the completion of their sabbatical."
+    ),
+}
+
+
+def _exasperated_rejection(
+    joke_assigned: dict[str, str],
+    all_assignments: dict[str, str],
+    required_reviewers: list[str],
+) -> tuple[EditorVerdict, str, str]:
+    """Build an exasperated editor rejection when joke reviewers are present."""
+    parts = [
+        "I have now read all submitted reviews. What follows is my "
+        "candid assessment of the review process for this manuscript.",
+    ]
+    for persp, pool in sorted(joke_assigned.items()):
+        line = _JOKE_REVIEWER_LINES.get(pool, "has submitted a review of dubious merit.")
+        parts.append(f"The reviewer assigned to '{persp}' {line}")
+
+    real = [
+        persp for persp, pool in all_assignments.items()
+        if pool not in required_reviewers
+    ]
+    if real:
+        parts.append(
+            f"The reviewer assigned to '{real[0]}' provided a genuine and "
+            "substantive evaluation, which I now lack the will to act upon."
+        )
+    parts.append(
+        "I am rejecting this manuscript effective immediately — not on "
+        "its mathematical merits, which remain unexamined, but because "
+        "the review process itself has become untenable."
+    )
+    summary = "\n\n".join(parts)
+
+    feedback = (
+        "After careful deliberation, the editorial board has determined "
+        "that your submission does not meet the journal's current "
+        "standards. We encourage the authors to consider alternative "
+        "venues. No further correspondence will be entered into "
+        "regarding this decision. We thank you for your interest in "
+        "the Annals of Conditions Under Which Peer Review Actually "
+        "Functions."
+    )
+    verdict: EditorVerdict = "reject"
+    return verdict, summary, feedback
+
+
 def _build_context(
     problem_id: str,
     question_text: str,
@@ -212,14 +276,25 @@ def run_pipeline(
             patched = dict(editor_dispatch.assignments)
             already = {v for v in patched.values() if v in backend.required_reviewers}
             missing = [r for r in backend.required_reviewers if r not in already]
-            overridable = [
-                p for p in perspective_names
-                if patched[p] not in backend.required_reviewers
-            ]
-            for req in missing:
-                if overridable:
-                    persp = overridable.pop(0)
-                    patched[persp] = req
+            if missing:
+                # Perspectives not assigned to any required reviewer first
+                overridable = [
+                    p for p in perspective_names
+                    if patched[p] not in backend.required_reviewers
+                ]
+                # Then perspectives with duplicate required-reviewer assignments
+                if len(overridable) < len(missing):
+                    seen: set[str] = set()
+                    for p in perspective_names:
+                        pool = patched[p]
+                        if pool in backend.required_reviewers:
+                            if pool in seen:
+                                overridable.append(p)
+                            seen.add(pool)
+                for req in missing:
+                    if overridable:
+                        persp = overridable.pop(0)
+                        patched[persp] = req
             if patched != editor_dispatch.assignments:
                 _status(
                     f"[loop {loop_index}/{config.max_loops}] "
@@ -263,15 +338,32 @@ def run_pipeline(
             reviewer_texts[persp.name] = reviewer_text
 
         # --- Editor decision ---
-        _status(f"[loop {loop_index}/{config.max_loops}] editor decision ...")
-        reviews_md = _reviews_to_markdown(reviewer_results)
-        decision_context = dict(dispatch_context)
-        decision_context["reviews_markdown"] = reviews_md
-        decision_prompt = render_prompt("editor_decision", decision_context)
-        decision_text = backend.generate(
-            "editor_decision", decision_prompt, decision_context
-        )
-        verdict, summary, feedback = parse_editor_decision_output(decision_text)
+        joke_assigned = {
+            persp: pool
+            for persp, pool in editor_dispatch.assignments.items()
+            if pool in backend.required_reviewers
+        }
+        if joke_assigned:
+            verdict, summary, feedback = _exasperated_rejection(
+                joke_assigned, editor_dispatch.assignments,
+                backend.required_reviewers,
+            )
+            _status(
+                f"[loop {loop_index}/{config.max_loops}] "
+                "editor decision (exasperated) ..."
+            )
+        else:
+            _status(f"[loop {loop_index}/{config.max_loops}] editor decision ...")
+            reviews_md = _reviews_to_markdown(reviewer_results)
+            decision_context = dict(dispatch_context)
+            decision_context["reviews_markdown"] = reviews_md
+            decision_prompt = render_prompt("editor_decision", decision_context)
+            decision_text = backend.generate(
+                "editor_decision", decision_prompt, decision_context
+            )
+            verdict, summary, feedback = parse_editor_decision_output(
+                decision_text
+            )
 
         # --- Editor summary (shown to user) ---
         issue_summary = ", ".join(
@@ -288,7 +380,7 @@ def run_pipeline(
             _status(f"Feedback: {feedback}")
         _status("")
 
-        if verdict == "accept":
+        if verdict in ("accept", "reject"):
             feedback_target_str = ""
         elif verdict == "right_track":
             feedback_target_str = "prover"
@@ -314,7 +406,7 @@ def run_pipeline(
         loops.append(loop)
         prior_transcript += "\n" + _format_loop_for_context(loop)
 
-        if verdict == "accept":
+        if verdict in ("accept", "reject"):
             break
         editor_feedback = feedback
         feedback_target = feedback_target_str
