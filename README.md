@@ -131,8 +131,7 @@ credentials there instead of exporting them in your shell.
 
 - **`main`** — production pipeline code (run artifacts are gitignored)
 - **`digital_twin`** — a more realistic model of the academic peer review
-  process, featuring joke reviewer backends (the Self-Citer and the Extension
-  Requester) and an exasperated managing editor
+  process 😉
 - **`live_runs`** — archived transcripts, LaTeX reports, and metadata from
   past pipeline runs
 
