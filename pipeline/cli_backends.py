@@ -106,20 +106,13 @@ class CodexCLIBackend:
             output_path = Path(tmp_dir) / "last_message.txt"
             cmd = self._command(output_path, reasoning_effort)
 
-            try:
-                proc = subprocess.run(
-                    cmd,
-                    input=prompt,
-                    text=True,
-                    capture_output=True,
-                    timeout=self.cfg.timeout,
-                    check=False,
-                )
-            except subprocess.TimeoutExpired as exc:
-                raise RuntimeError(
-                    f"Codex backend timed out for role '{role}' "
-                    f"after {self.cfg.timeout} seconds"
-                ) from exc
+            proc = subprocess.run(
+                cmd,
+                input=prompt,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
 
             if proc.returncode == 0:
                 if output_path.exists():
@@ -192,21 +185,14 @@ class ClaudeCLIBackend:
         cmd = self._command()
         cwd = str(self.workdir) if self.workdir else None
 
-        try:
-            proc = subprocess.run(
-                cmd,
-                input=prompt,
-                text=True,
-                capture_output=True,
-                timeout=self.cfg.timeout,
-                check=False,
-                cwd=cwd,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise RuntimeError(
-                f"Claude CLI timed out for role '{role}' "
-                f"after {self.cfg.timeout} seconds"
-            ) from exc
+        proc = subprocess.run(
+            cmd,
+            input=prompt,
+            text=True,
+            capture_output=True,
+            check=False,
+            cwd=cwd,
+        )
 
         if proc.returncode == 0:
             text = proc.stdout.strip()
@@ -249,21 +235,14 @@ class GenericCLIBackend:
             cmd.extend(["--model", self.cfg.model])
         cwd = str(self.workdir) if self.workdir else None
 
-        try:
-            proc = subprocess.run(
-                cmd,
-                input=prompt,
-                text=True,
-                capture_output=True,
-                timeout=self.cfg.timeout,
-                check=False,
-                cwd=cwd,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise RuntimeError(
-                f"CLI backend '{self.cfg.cli_command}' timed out for role "
-                f"'{role}' after {self.cfg.timeout} seconds"
-            ) from exc
+        proc = subprocess.run(
+            cmd,
+            input=prompt,
+            text=True,
+            capture_output=True,
+            check=False,
+            cwd=cwd,
+        )
 
         if proc.returncode == 0:
             text = proc.stdout.strip()

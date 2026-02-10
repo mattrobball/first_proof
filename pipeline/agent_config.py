@@ -84,7 +84,6 @@ class AgentModelConfig:
     api_key_env: str = ""
     temperature: float = 0.2
     max_tokens: int = 16384
-    timeout: int = 600
     cli_command: str = ""
     reasoning_effort: str = ""
 

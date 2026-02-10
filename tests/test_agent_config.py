@@ -85,7 +85,7 @@ provider    = "claude"
     assert statement.model == "claude-base"
 
 
-def test_load_config_temperature_and_timeout(tmp_path: Path) -> None:
+def test_load_config_temperature(tmp_path: Path) -> None:
     cfg_path = tmp_path / "pipeline.toml"
     _write(
         cfg_path,
@@ -93,7 +93,6 @@ def test_load_config_temperature_and_timeout(tmp_path: Path) -> None:
 [defaults]
 backend     = "demo"
 temperature = 0.7
-timeout     = 300
 
 [agents.sketch]
 temperature = 0.0
@@ -101,10 +100,8 @@ temperature = 0.0
     )
     fc = load_config_file(cfg_path)
     assert fc.defaults.temperature == 0.7
-    assert fc.defaults.timeout == 300
     sketch = fc.resolve("sketch")
     assert sketch.temperature == 0.0
-    assert sketch.timeout == 300  # inherited
 
 
 def test_load_config_with_agent_pool(tmp_path: Path) -> None:

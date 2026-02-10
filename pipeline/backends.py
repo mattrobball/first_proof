@@ -282,7 +282,6 @@ class CodexCLIBackend:
     codex_bin: str = "codex"
     workdir: Path | None = None
     sandbox: str = "workspace-write"
-    timeout_seconds: int = 600
     full_auto: bool = True
     skip_git_repo_check: bool = True
     color: str = "never"
@@ -353,20 +352,13 @@ class CodexCLIBackend:
             output_path = Path(tmp_dir) / "last_message.txt"
             cmd = self._command(output_path, reasoning_effort)
 
-            try:
-                proc = subprocess.run(
-                    cmd,
-                    input=prompt,
-                    text=True,
-                    capture_output=True,
-                    timeout=self.timeout_seconds,
-                    check=False,
-                )
-            except subprocess.TimeoutExpired as exc:
-                raise RuntimeError(
-                    f"Codex backend timed out for role '{role}' "
-                    f"after {self.timeout_seconds} seconds"
-                ) from exc
+            proc = subprocess.run(
+                cmd,
+                input=prompt,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
 
             if proc.returncode == 0:
                 if output_path.exists():
