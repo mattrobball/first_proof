@@ -5,10 +5,12 @@ from pathlib import Path
 import pytest
 
 from pipeline.agent_config import (
+    APPROVED_BACKENDS,
     AgentModelConfig,
     PipelineFileConfig,
     find_config_file,
     load_config_file,
+    validate_approved_backends,
 )
 
 
@@ -239,3 +241,122 @@ def test_find_config_search_dirs(tmp_path: Path) -> None:
 def test_find_config_returns_none_when_absent(tmp_path: Path) -> None:
     found = find_config_file(search_dirs=[tmp_path])
     assert found is None
+
+
+# ---------------------------------------------------------------------------
+# pipeline.toml loading
+# ---------------------------------------------------------------------------
+
+
+def test_load_pipeline_toml() -> None:
+    """The real pipeline.toml at the project root parses without error."""
+    root = Path(__file__).resolve().parent.parent / "pipeline.toml"
+    fc = load_config_file(root)
+    assert fc.defaults.backend == "cli"
+    assert fc.defaults.provider == "codex"
+    assert len(fc.reviewer_pool) >= 3
+
+
+# ---------------------------------------------------------------------------
+# validate_approved_backends
+# ---------------------------------------------------------------------------
+
+
+def _approved_config(**pool_overrides: dict) -> PipelineFileConfig:
+    """Build a PipelineFileConfig using only approved backends."""
+    return PipelineFileConfig(
+        defaults=AgentModelConfig(backend="cli", provider="codex", model="codex-5.3"),
+        agents={},
+        reviewer_pool={
+            "claude_reviewer": AgentModelConfig(
+                backend="cli", provider="claude", model="claude-opus-4-6",
+            ),
+            "gemini_reviewer": AgentModelConfig(
+                backend="api", provider="gemini", model="gemini-3.0-pro",
+            ),
+            **pool_overrides,
+        },
+    )
+
+
+def test_approved_backends_pass() -> None:
+    fc = _approved_config()
+    validate_approved_backends(fc)  # should not raise
+
+
+def test_unapproved_provider_rejected() -> None:
+    fc = PipelineFileConfig(
+        defaults=AgentModelConfig(backend="api", provider="openai", model="gpt-4o"),
+        agents={},
+    )
+    with pytest.raises(ValueError, match="Unapproved backend"):
+        validate_approved_backends(fc)
+
+
+def test_unapproved_model_rejected() -> None:
+    fc = PipelineFileConfig(
+        defaults=AgentModelConfig(backend="cli", provider="codex", model="codex-1.0"),
+        agents={},
+    )
+    with pytest.raises(ValueError, match="Unapproved backend"):
+        validate_approved_backends(fc)
+
+
+def test_all_pool_entries_validated() -> None:
+    fc = _approved_config(
+        bad_reviewer=AgentModelConfig(
+            backend="cli", provider="gemini", model="gemini-3.0-pro",
+        ),
+    )
+    with pytest.raises(ValueError, match="reviewer_pool.bad_reviewer"):
+        validate_approved_backends(fc)
+
+
+def test_default_backend_validated() -> None:
+    fc = PipelineFileConfig(
+        defaults=AgentModelConfig(backend="demo", provider="anthropic", model="x"),
+        agents={},
+    )
+    with pytest.raises(ValueError, match="defaults"):
+        validate_approved_backends(fc)
+
+
+def test_pipeline_toml_all_approved() -> None:
+    """The real pipeline.toml passes approved-backend validation."""
+    root = Path(__file__).resolve().parent.parent / "pipeline.toml"
+    fc = load_config_file(root)
+    validate_approved_backends(fc)  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# reasoning_effort wiring
+# ---------------------------------------------------------------------------
+
+
+def test_codex_reasoning_effort_from_config() -> None:
+    from unittest.mock import patch
+
+    cfg = AgentModelConfig(
+        backend="cli", provider="codex", model="codex-5.3",
+        reasoning_effort="xhigh",
+    )
+    with patch("shutil.which", return_value="/usr/bin/codex"):
+        from pipeline.cli_backends import CodexCLIBackend
+        backend = CodexCLIBackend(cfg=cfg)
+    assert backend.target_reasoning_effort == "xhigh"
+
+
+def test_claude_effort_from_config() -> None:
+    from unittest.mock import patch
+
+    cfg = AgentModelConfig(
+        backend="cli", provider="claude", model="claude-opus-4-6",
+        reasoning_effort="high",
+    )
+    with patch("shutil.which", return_value="/usr/bin/claude"):
+        from pipeline.cli_backends import ClaudeCLIBackend
+        backend = ClaudeCLIBackend(cfg=cfg)
+    cmd = backend._command()
+    assert "--effort" in cmd
+    idx = cmd.index("--effort")
+    assert cmd[idx + 1] == "high"

@@ -86,6 +86,7 @@ class AgentModelConfig:
     max_tokens: int = 16384
     timeout: int = 600
     cli_command: str = ""
+    reasoning_effort: str = ""
 
     def resolved_api_key(self) -> str:
         """Return the API key from the environment, or raise."""
@@ -184,6 +185,31 @@ def load_config_file(path: Path) -> PipelineFileConfig:
     return PipelineFileConfig(
         defaults=defaults, agents=agents, reviewer_pool=reviewer_pool
     )
+
+
+APPROVED_BACKENDS: frozenset[tuple[str, str, str]] = frozenset({
+    ("cli", "claude", "claude-opus-4-6"),
+    ("cli", "codex", "codex-5.3"),
+    ("api", "gemini", "gemini-3.0-pro"),
+})
+
+
+def validate_approved_backends(config: PipelineFileConfig) -> None:
+    """Raise ``ValueError`` if any configured backend is not in APPROVED_BACKENDS."""
+    entries: list[tuple[str, AgentModelConfig]] = [("defaults", config.defaults)]
+    for role, cfg in config.agents.items():
+        entries.append((f"agents.{role}", cfg))
+    for pool_name, cfg in config.reviewer_pool.items():
+        entries.append((f"reviewer_pool.{pool_name}", cfg))
+
+    for label, cfg in entries:
+        key = (cfg.backend, cfg.provider, cfg.model)
+        if key not in APPROVED_BACKENDS:
+            raise ValueError(
+                f"Unapproved backend in [{label}]: "
+                f"backend={cfg.backend!r}, provider={cfg.provider!r}, "
+                f"model={cfg.model!r}"
+            )
 
 
 def find_config_file(

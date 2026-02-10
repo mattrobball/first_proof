@@ -40,6 +40,7 @@ class CodexCLIBackend:
     target_reasoning_effort: str = "xhigh"
 
     def __post_init__(self) -> None:
+        self.target_reasoning_effort = self.cfg.reasoning_effort or self.target_reasoning_effort
         binary = self.cfg.resolved_cli_command()
         resolved = shutil.which(binary)
         if resolved is None:
@@ -176,6 +177,8 @@ class ClaudeCLIBackend:
         cmd = [self._resolved_bin, "--print", "--output-format", "text"]
         if self.cfg.model:
             cmd.extend(["--model", self.cfg.model])
+        if self.cfg.reasoning_effort:
+            cmd.extend(["--effort", self.cfg.reasoning_effort])
         return cmd
 
     @staticmethod

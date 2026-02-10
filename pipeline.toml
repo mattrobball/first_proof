@@ -1,0 +1,22 @@
+[defaults]
+backend  = "cli"
+provider = "codex"
+model    = "codex-5.3"
+reasoning_effort = "xhigh"
+
+[reviewer_pool.claude_reviewer]
+backend  = "cli"
+provider = "claude"
+model    = "claude-opus-4-6"
+reasoning_effort = "high"
+
+[reviewer_pool.codex_reviewer]
+backend  = "cli"
+provider = "codex"
+model    = "codex-5.3"
+reasoning_effort = "xhigh"
+
+[reviewer_pool.gemini_reviewer]
+backend  = "api"
+provider = "gemini"
+model    = "gemini-3.0-pro"

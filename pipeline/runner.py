@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from .agent_config import find_config_file, load_config_file
+from .agent_config import find_config_file, load_config_file, validate_approved_backends
 from .agents import render_prompt
 from .backends import BackendRouter, build_backend, build_backend_from_config
 from .config import PipelineConfig
@@ -377,12 +377,19 @@ def _resolve_backend(
     config: PipelineConfig, problem_dir: Path
 ) -> BackendRouter:
     """Build the appropriate backend: config-file router or legacy single."""
+    # Explicit --backend demo bypasses config file discovery
+    if config.backend == "demo" and config.config_path is None:
+        return build_backend(
+            config.backend, config.model, config.seed, workdir=Path.cwd()
+        )
+
     config_file = find_config_file(
         explicit=config.config_path,
         search_dirs=[problem_dir, Path.cwd()],
     )
     if config_file is not None:
         file_config = load_config_file(config_file)
+        validate_approved_backends(file_config)
         print(f"[info] Using config: {config_file}", file=sys.stderr)
         return build_backend_from_config(file_config, workdir=Path.cwd())
 
