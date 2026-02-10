@@ -3,15 +3,107 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import PipelineConfig
 from .models import LoopRecord, PipelineRunResult, ProblemInputs
 
+_PAPER_FILENAME = "first_proof.md"
+
+# Regex: matches **Question N.** at the start of a line (N is one or more digits)
+_QUESTION_START_RE = re.compile(r"^\*\*Question\s+(\d+)\.\*\*", re.MULTILINE)
+
 
 class InputValidationError(ValueError):
     pass
+
+
+def _extract_question_from_paper(paper_text: str, problem_number: int) -> str | None:
+    """Extract Question *problem_number* from the First Proof paper text.
+
+    Returns the raw question text (including the ``**Question N.**`` prefix)
+    or ``None`` if no matching question is found.
+    """
+    matches = list(_QUESTION_START_RE.finditer(paper_text))
+    target_match = None
+    for m in matches:
+        if int(m.group(1)) == problem_number:
+            target_match = m
+            break
+    if target_match is None:
+        return None
+
+    start = target_match.start()
+    # Find the end: next **Question or a ## heading
+    rest = paper_text[target_match.end():]
+    end_re = re.search(r"^\*\*Question\s+\d+\.\*\*|^## ", rest, re.MULTILINE)
+    if end_re:
+        end = target_match.end() + end_re.start()
+    else:
+        end = len(paper_text)
+    return paper_text[start:end].strip()
+
+
+def ensure_problem_files(problem_dir: Path, repo_root: Path | None = None) -> None:
+    """Create the problem directory and generate QUESTION.md if missing.
+
+    If *problem_dir* does not exist it is created.  If ``QUESTION.md`` is
+    absent and the ``first_proof.md`` paper file is found, the question is
+    extracted from the paper and written to ``QUESTION.md``.  A minimal
+    ``BACKGROUND.md`` stub is created when that file is also absent.
+    """
+    problem_dir.mkdir(parents=True, exist_ok=True)
+
+    question_path = problem_dir / "QUESTION.md"
+    background_path = problem_dir / "BACKGROUND.md"
+
+    # Try to parse the problem number from the directory name
+    try:
+        problem_number = int(problem_dir.name)
+    except ValueError:
+        problem_number = None
+
+    # --- QUESTION.md ---
+    if not question_path.exists() and problem_number is not None:
+        search_dirs = [problem_dir.parent]
+        if repo_root is not None and repo_root not in search_dirs:
+            search_dirs.append(repo_root)
+        search_dirs.append(Path.cwd())
+
+        for d in search_dirs:
+            paper_path = d / _PAPER_FILENAME
+            if paper_path.is_file():
+                paper_text = paper_path.read_text(encoding="utf-8")
+                extracted = _extract_question_from_paper(paper_text, problem_number)
+                if extracted is not None:
+                    question_path.write_text(
+                        f"# Question {problem_number}\n\n{extracted}\n",
+                        encoding="utf-8",
+                    )
+                    print(
+                        f"[info] Generated {question_path} from {paper_path}",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        f"[warn] Question {problem_number} not found in {paper_path}",
+                        file=sys.stderr,
+                    )
+                break
+
+    # --- BACKGROUND.md stub ---
+    if not background_path.exists():
+        background_path.write_text(
+            "# Background\n\n"
+            "<!-- Add relevant definitions, theorems, and context here. -->\n",
+            encoding="utf-8",
+        )
+        print(
+            f"[info] Created stub {background_path} — please add background material",
+            file=sys.stderr,
+        )
 
 
 def _read_required_markdown(path: Path) -> str:

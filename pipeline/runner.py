@@ -15,6 +15,7 @@ from .io import (
     build_latex,
     build_transcript,
     ensure_output_dir,
+    ensure_problem_files,
     format_timestamp,
     load_problem_inputs,
     utc_now,
@@ -597,6 +598,7 @@ def main(argv: list[str] | None = None) -> int:
 
     problem_dir = _resolve_problem_dir(args.problem)
     _load_secrets(problem_dir, Path.cwd())
+    ensure_problem_files(problem_dir, repo_root=Path.cwd())
 
     try:
         config.validate()

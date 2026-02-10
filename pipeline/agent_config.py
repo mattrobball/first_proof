@@ -196,7 +196,7 @@ def load_config_file(path: Path) -> PipelineFileConfig:
 
 APPROVED_BACKENDS: frozenset[tuple[str, str, str]] = frozenset({
     ("cli", "claude", "claude-opus-4-6"),
-    ("cli", "codex", "codex-5.3"),
+    ("cli", "codex", "gpt-5.3-codex"),
     ("api", "gemini", "gemini-3-pro-preview"),
     ("self_citer", "digital_twin", "reviewer-2"),
     ("extension_requester", "digital_twin", "reviewer-2"),

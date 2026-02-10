@@ -321,7 +321,7 @@ def test_load_pipeline_toml() -> None:
 def _approved_config(**pool_overrides: dict) -> PipelineFileConfig:
     """Build a PipelineFileConfig using only approved backends."""
     return PipelineFileConfig(
-        defaults=AgentModelConfig(backend="cli", provider="codex", model="codex-5.3"),
+        defaults=AgentModelConfig(backend="cli", provider="codex", model="gpt-5.3-codex"),
         agents={},
         reviewer_pool={
             "claude_reviewer": AgentModelConfig(
@@ -393,7 +393,7 @@ def test_codex_reasoning_effort_from_config() -> None:
     from unittest.mock import patch
 
     cfg = AgentModelConfig(
-        backend="cli", provider="codex", model="codex-5.3",
+        backend="cli", provider="codex", model="gpt-5.3-codex",
         reasoning_effort="xhigh",
     )
     with patch("shutil.which", return_value="/usr/bin/codex"):

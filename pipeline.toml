@@ -4,7 +4,7 @@ required_reviewers = ["self_citer", "extension_requester"]
 [defaults]
 backend  = "cli"
 provider = "codex"
-model    = "codex-5.3"
+model    = "gpt-5.3-codex"
 reasoning_effort = "xhigh"
 
 [reviewer_pool.claude_reviewer]
@@ -16,7 +16,7 @@ reasoning_effort = "high"
 [reviewer_pool.codex_reviewer]
 backend  = "cli"
 provider = "codex"
-model    = "codex-5.3"
+model    = "gpt-5.3-codex"
 reasoning_effort = "xhigh"
 
 [reviewer_pool.gemini_reviewer]
