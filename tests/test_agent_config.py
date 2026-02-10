@@ -276,6 +276,34 @@ backend = "demo"
     assert fc.randomize_agents is False
 
 
+def test_required_reviewers_parsed(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "pipeline.toml"
+    _write(
+        cfg_path,
+        """\
+required_reviewers = ["self_citer", "extension_requester"]
+
+[defaults]
+backend = "demo"
+""",
+    )
+    fc = load_config_file(cfg_path)
+    assert fc.required_reviewers == ["self_citer", "extension_requester"]
+
+
+def test_required_reviewers_default_empty(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "pipeline.toml"
+    _write(
+        cfg_path,
+        """\
+[defaults]
+backend = "demo"
+""",
+    )
+    fc = load_config_file(cfg_path)
+    assert fc.required_reviewers == []
+
+
 def test_load_pipeline_toml() -> None:
     """The real pipeline.toml at the project root parses without error."""
     root = Path(__file__).resolve().parent.parent / "pipeline.toml"

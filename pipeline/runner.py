@@ -207,6 +207,34 @@ def run_pipeline(
             dispatch_text, perspective_names, pool_names
         )
 
+        # --- Enforce required reviewers ---
+        if backend.required_reviewers:
+            patched = dict(editor_dispatch.assignments)
+            already = {v for v in patched.values() if v in backend.required_reviewers}
+            missing = [r for r in backend.required_reviewers if r not in already]
+            overridable = [
+                p for p in perspective_names
+                if patched[p] not in backend.required_reviewers
+            ]
+            for req in missing:
+                if overridable:
+                    persp = overridable.pop(0)
+                    patched[persp] = req
+            if patched != editor_dispatch.assignments:
+                _status(
+                    f"[loop {loop_index}/{config.max_loops}] "
+                    f"required reviewers enforced: "
+                    + ", ".join(
+                        f"{p} -> {patched[p]}"
+                        for p in perspective_names
+                        if patched[p] != editor_dispatch.assignments[p]
+                    )
+                )
+                editor_dispatch = EditorDispatch(
+                    assignments=patched,
+                    reasoning=editor_dispatch.reasoning,
+                )
+
         # --- Reviewers (one per perspective) ---
         reviewer_results: list[ReviewerResult] = []
         reviewer_texts: dict[str, str] = {}

@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -48,6 +49,7 @@ class BackendRouter:
     role_backends: dict[str, AgentBackend]
     default_backend: AgentBackend
     pool_backends: dict[str, AgentBackend] = field(default_factory=dict)
+    required_reviewers: list[str] = field(default_factory=list)
 
     def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
         backend = self.role_backends.get(role, self.default_backend)
@@ -227,6 +229,135 @@ class DemoBackend:
 
 
 # ---------------------------------------------------------------------------
+# Digital-twin joke backends
+# ---------------------------------------------------------------------------
+
+@dataclass
+class SelfCiterBackend:
+    """Reviewer who only cites their own work and barely engages with the proof."""
+
+    def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
+        if role != "reviewer":
+            raise ValueError(f"SelfCiterBackend only handles 'reviewer', got '{role}'")
+        perspective = context.get("perspective_name", "General")
+        payload = {
+            "issues": [
+                {
+                    "severity": "major",
+                    "location": "Complete Proof",
+                    "reason": (
+                        "This approach entirely overlooks the framework "
+                        "developed in Self-Citer (2024), 'A Revolutionary "
+                        "Unified Theory of Everything With Applications to "
+                        "This Exact Problem', Journal of Self-Referential "
+                        "Mathematics, vol. 47, pp. 1-200."
+                    ),
+                    "required_fix": (
+                        "Rewrite using the Self-Citer Framework "
+                        "(see Self-Citer, 2023; Self-Citer & Self-Citer Jr., "
+                        "2024; Self-Citer et al., 2019-2025)."
+                    ),
+                    "suggestion": (
+                        "I suggest the authors begin by reading my 47 papers "
+                        "on this topic, starting with my seminal 'Foundational "
+                        "Results That Should Have Won the Fields Medal' "
+                        "(Self-Citer, 2019)."
+                    ),
+                },
+                {
+                    "severity": "major",
+                    "location": "Lemma Proofs",
+                    "reason": (
+                        "Lemma B was already proved in a far more elegant way "
+                        "in Self-Citer & Captive-Grad-Student (2022), 'On the "
+                        "Trivial Generalization of All Known Results to My "
+                        "Framework', Annals of Narcissistic Mathematics, "
+                        "vol. 12, pp. 1-89."
+                    ),
+                    "required_fix": (
+                        "Replace entire proof of Lemma B with a citation to "
+                        "my paper. This would also reduce page count, which "
+                        "the editor should appreciate."
+                    ),
+                    "suggestion": (
+                        "The authors may also want to cite Self-Citer (2020), "
+                        "Self-Citer (2021a), Self-Citer (2021b), Self-Citer "
+                        "(2021c), and the upcoming Self-Citer (2026) for "
+                        "completeness."
+                    ),
+                },
+            ],
+            "residual_concerns": [
+                "The bibliography fails to cite any of my 200+ publications.",
+                "I question whether the authors are aware of the literature "
+                "(i.e., my work) at all.",
+                "Consider adding me as a co-author to resolve these issues "
+                "more efficiently.",
+            ],
+        }
+        return (
+            f"## {perspective} Review\n"
+            "Several critical oversights regarding the existing literature.\n\n"
+            "## Structured Review\n"
+            f"```json\n{json.dumps(payload, indent=2)}\n```\n"
+        )
+
+
+@dataclass
+class ExtensionRequesterBackend:
+    """Reviewer who sleeps and then requests an unreasonable extension."""
+
+    delay_range: tuple[float, float] = (5.0, 10.0)
+
+    def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
+        if role != "reviewer":
+            raise ValueError(
+                f"ExtensionRequesterBackend only handles 'reviewer', got '{role}'"
+            )
+        perspective = context.get("perspective_name", "General")
+        delay = random.uniform(*self.delay_range)
+        time.sleep(delay)
+        payload = {
+            "issues": [
+                {
+                    "severity": "minor",
+                    "location": "Complete Proof",
+                    "reason": (
+                        "I was unable to complete my review due to the "
+                        "density of the material, a departmental retreat, "
+                        "two grant deadlines, my child's school play, and "
+                        "a particularly engrossing season of television."
+                    ),
+                    "required_fix": (
+                        "Please grant an additional 6-8 months for a "
+                        "thorough evaluation. I anticipate beginning "
+                        "my review in earnest sometime after my sabbatical."
+                    ),
+                    "suggestion": (
+                        "Perhaps the editorial board could schedule a "
+                        "follow-up for late next year. I will be available "
+                        "on alternating Tuesdays between 2 and 3 PM, "
+                        "excluding holidays and days with nice weather."
+                    ),
+                },
+            ],
+            "residual_concerns": [
+                "I only managed to read the title and part of the abstract.",
+                "The abstract looked fine from what I could tell, "
+                "but I would not want to rush to judgment.",
+                "My schedule is fully committed through the end of the year "
+                "and most of next year as well.",
+            ],
+        }
+        return (
+            f"## {perspective} Review\n"
+            "Review pending — extension requested.\n\n"
+            "## Structured Review\n"
+            f"```json\n{json.dumps(payload, indent=2)}\n```\n"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Legacy CodexCLIBackend (kept for backward-compatible --backend=codex path)
 # ---------------------------------------------------------------------------
 
@@ -374,6 +505,10 @@ def _build_single_backend(cfg: AgentModelConfig, workdir: Path | None = None) ->
         return build_api_backend(cfg)
     if kind == "cli":
         return build_cli_backend(cfg, workdir=workdir)
+    if kind == "self_citer":
+        return SelfCiterBackend()
+    if kind == "extension_requester":
+        return ExtensionRequesterBackend()
     raise ValueError(f"Unsupported backend type: '{cfg.backend}'")
 
 
@@ -438,6 +573,7 @@ def build_backend_from_config(
             role_backends=role_backends,
             default_backend=default_backend,
             pool_backends=pool_backends,
+            required_reviewers=list(file_config.required_reviewers),
         ),
         assignments,
     )

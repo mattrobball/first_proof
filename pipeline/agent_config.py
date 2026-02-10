@@ -130,6 +130,7 @@ class PipelineFileConfig:
     agents: dict[str, AgentModelConfig]
     reviewer_pool: dict[str, AgentModelConfig] = field(default_factory=dict)
     randomize_agents: bool = False
+    required_reviewers: list[str] = field(default_factory=list)
 
     def resolve(self, role: str) -> AgentModelConfig:
         """Return effective config for *role*, falling back to defaults."""
@@ -184,10 +185,12 @@ def load_config_file(path: Path) -> PipelineFileConfig:
         reviewer_pool[pool_name] = _raw_to_agent_config(defaults_raw, pool_raw)
 
     randomize_agents = bool(data.get("randomize_agents", False))
+    required_reviewers = list(data.get("required_reviewers", []))
 
     return PipelineFileConfig(
         defaults=defaults, agents=agents, reviewer_pool=reviewer_pool,
         randomize_agents=randomize_agents,
+        required_reviewers=required_reviewers,
     )
 
 
@@ -195,6 +198,8 @@ APPROVED_BACKENDS: frozenset[tuple[str, str, str]] = frozenset({
     ("cli", "claude", "claude-opus-4-6"),
     ("cli", "codex", "codex-5.3"),
     ("api", "gemini", "gemini-3-pro-preview"),
+    ("self_citer", "digital_twin", "reviewer-2"),
+    ("extension_requester", "digital_twin", "reviewer-2"),
 })
 
 

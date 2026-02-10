@@ -10,10 +10,13 @@ from pipeline.backends import (
     BackendRouter,
     CodexCLIBackend,
     DemoBackend,
+    ExtensionRequesterBackend,
+    SelfCiterBackend,
     _build_single_backend,
     build_backend,
     build_backend_from_config,
 )
+from pipeline.validate import parse_reviewer_output
 
 
 # ---------------------------------------------------------------------------
@@ -169,6 +172,89 @@ def test_randomize_respects_explicit_agents() -> None:
     assert "mentor" in assignments
     assert "editor_dispatch" in assignments
     assert "editor_decision" in assignments
+
+
+# ---------------------------------------------------------------------------
+# Digital-twin joke backends
+# ---------------------------------------------------------------------------
+
+
+def test_self_citer_generates_valid_reviewer_output() -> None:
+    backend = SelfCiterBackend()
+    ctx = {"perspective_name": "Correctness & Completeness", "loop_index": "1"}
+    text = backend.generate("reviewer", "", ctx)
+    result = parse_reviewer_output(text, "self_citer", "Correctness & Completeness")
+    assert len(result.issues) == 2
+    assert all(i.severity == "major" for i in result.issues)
+    assert any("Self-Citer" in i.reason for i in result.issues)
+    assert any("bibliography" in c.lower() for c in result.residual_concerns)
+
+
+def test_self_citer_rejects_non_reviewer_role() -> None:
+    backend = SelfCiterBackend()
+    with pytest.raises(ValueError, match="only handles 'reviewer'"):
+        backend.generate("prover", "", {})
+
+
+def test_extension_requester_generates_valid_reviewer_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("pipeline.backends.time.sleep", lambda _: None)
+    backend = ExtensionRequesterBackend()
+    ctx = {"perspective_name": "Clarity & Rigor", "loop_index": "1"}
+    text = backend.generate("reviewer", "", ctx)
+    result = parse_reviewer_output(text, "extension_requester", "Clarity & Rigor")
+    assert len(result.issues) == 1
+    assert result.issues[0].severity == "minor"
+    assert "6-8 months" in result.issues[0].required_fix
+    assert any("abstract" in c.lower() for c in result.residual_concerns)
+
+
+def test_extension_requester_rejects_non_reviewer_role(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("pipeline.backends.time.sleep", lambda _: None)
+    backend = ExtensionRequesterBackend()
+    with pytest.raises(ValueError, match="only handles 'reviewer'"):
+        backend.generate("mentor", "", {})
+
+
+def test_build_single_backend_self_citer() -> None:
+    cfg = AgentModelConfig(backend="self_citer")
+    backend = _build_single_backend(cfg)
+    assert isinstance(backend, SelfCiterBackend)
+
+
+def test_build_single_backend_extension_requester() -> None:
+    cfg = AgentModelConfig(backend="extension_requester")
+    backend = _build_single_backend(cfg)
+    assert isinstance(backend, ExtensionRequesterBackend)
+
+
+# ---------------------------------------------------------------------------
+# Required reviewers
+# ---------------------------------------------------------------------------
+
+
+def test_required_reviewers_threaded_to_router() -> None:
+    defaults = AgentModelConfig(backend="demo")
+    pool = {
+        "real_reviewer": AgentModelConfig(backend="demo"),
+        "self_citer": AgentModelConfig(backend="self_citer"),
+    }
+    fc = PipelineFileConfig(
+        defaults=defaults, agents={}, reviewer_pool=pool,
+        required_reviewers=["self_citer"],
+    )
+    router, _ = build_backend_from_config(fc)
+    assert router.required_reviewers == ["self_citer"]
+
+
+def test_required_reviewers_empty_by_default() -> None:
+    defaults = AgentModelConfig(backend="demo")
+    fc = PipelineFileConfig(defaults=defaults, agents={})
+    router, _ = build_backend_from_config(fc)
+    assert router.required_reviewers == []
 
 
 # ---------------------------------------------------------------------------

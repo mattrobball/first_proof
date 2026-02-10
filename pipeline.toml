@@ -1,4 +1,5 @@
 randomize_agents = true
+required_reviewers = ["self_citer", "extension_requester"]
 
 [defaults]
 backend  = "cli"
@@ -22,3 +23,13 @@ reasoning_effort = "xhigh"
 backend  = "api"
 provider = "gemini"
 model    = "gemini-3-pro-preview"
+
+[reviewer_pool.self_citer]
+backend  = "self_citer"
+provider = "digital_twin"
+model    = "reviewer-2"
+
+[reviewer_pool.extension_requester]
+backend  = "extension_requester"
+provider = "digital_twin"
+model    = "reviewer-2"
