@@ -51,32 +51,52 @@ Run artifacts are written to:
 - `N/runs/<timestamp>-report.tex`
 - `N/runs/<timestamp>-meta.json`
 
-## Usage
-
-Dry-run validation:
+## Quickstart
 
 ```bash
-python -m pipeline.runner --problem 5 --dry-run
+git clone https://github.com/mattrobball/first_proof.git
+cd first_proof
+git checkout digital_twin
 ```
 
-Run with local Codex CLI backend (default):
+Python 3.11 or later is required (`tomllib` is used from the standard library).
 
 ```bash
-python -m pipeline.runner --problem 5
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-Run with deterministic demo backend (for local testing):
+Run the demo (no API keys needed):
 
 ```bash
 python -m pipeline.runner --problem 5 --backend demo
 ```
 
-Useful flags:
-- `--max-loops 5`
-- `--rigor graduate`
-- `--out-dir runs`
-- `--seed 42`
-- `--config pipeline.toml`
+This runs the full pipeline with a deterministic stub backend — researcher,
+mentor, prover, reviewers, and editor — and writes a transcript, LaTeX report,
+and metadata file to `5/runs/`.
+
+## Other usage
+
+Dry-run (validate inputs and prompt rendering only):
+
+```bash
+python -m pipeline.runner --problem 5 --dry-run
+```
+
+Run with real backends via `pipeline.toml` (requires API keys or local CLI
+tools as configured):
+
+```bash
+python -m pipeline.runner --problem 5
+```
+
+Flags:
+- `--max-loops 5` — revision loop budget
+- `--rigor graduate` — rigor target label included in prompts
+- `--seed 42` — deterministic backend assignment when `randomize_agents` is on
+- `--config pipeline.toml` — explicit config file path
 
 ## Configuration
 
