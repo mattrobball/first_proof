@@ -127,6 +127,15 @@ credentials there instead of exporting them in your shell.
 - `2`: input or prompt validation failure
 - `3`: backend or runtime failure
 
+## Branches
+
+- **`main`** — production pipeline code (run artifacts are gitignored)
+- **`digital_twin`** — a more realistic model of the academic peer review
+  process, featuring joke reviewer backends (the Self-Citer and the Extension
+  Requester) and an exasperated managing editor
+- **`live_runs`** — archived transcripts, LaTeX reports, and metadata from
+  past pipeline runs
+
 ## Testing
 
 ```bash
