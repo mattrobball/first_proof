@@ -68,11 +68,12 @@ class AnthropicBackend:
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
         }
-        body = {
+        body: dict = {
             "model": self.cfg.model,
-            "max_tokens": self.cfg.max_tokens,
             "messages": [{"role": "user", "content": prompt}],
         }
+        if self.cfg.max_tokens:
+            body["max_tokens"] = self.cfg.max_tokens
         if self.cfg.temperature is not None:
             body["temperature"] = self.cfg.temperature
 

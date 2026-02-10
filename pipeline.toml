@@ -4,7 +4,7 @@ randomize_agents = true
 backend  = "cli"
 provider = "claude"
 model    = "claude-opus-4-6"
-reasoning_effort = "high"
+reasoning_effort = "max"
 
 [agent_pool.codex_cli]
 backend  = "cli"
@@ -16,3 +16,4 @@ reasoning_effort = "xhigh"
 backend  = "api"
 provider = "gemini"
 model    = "gemini-3-pro-preview"
+reasoning_effort = "max"
