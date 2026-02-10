@@ -7,11 +7,8 @@ Context:
 - Loop: {loop_index}/{max_loops}
 - Rigor target: {rigor}
 
-Statement:
-{statement_output}
-
-Sketch:
-{sketch_output}
+Mentor output:
+{mentor_output}
 
 Prover output:
 {prover_output}

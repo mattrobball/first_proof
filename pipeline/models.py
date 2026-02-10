@@ -90,8 +90,7 @@ class EditorDecision:
 @dataclass(frozen=True)
 class LoopRecord:
     loop_index: int
-    statement_text: str
-    sketch_text: str
+    mentor_text: str
     prover_text: str
     editor_dispatch: EditorDispatch
     reviewer_texts: dict[str, str]
@@ -107,6 +106,7 @@ class PipelineRunResult:
     executed_loops: int
     final_verdict: EditorVerdict
     issue_counts: dict[str, int]
+    researcher_text: str
     loops: list[LoopRecord]
     transcript_path: Path
     meta_path: Path
@@ -121,6 +121,7 @@ class PipelineRunResult:
             "executed_loops": self.executed_loops,
             "final_verdict": self.final_verdict,
             "issue_counts": self.issue_counts,
+            "researcher_text": self.researcher_text,
             "transcript_path": str(self.transcript_path),
             "meta_path": str(self.meta_path),
             "latex_path": str(self.latex_path),

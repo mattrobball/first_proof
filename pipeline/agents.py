@@ -4,8 +4,8 @@ from functools import lru_cache
 from pathlib import Path
 
 ROLE_TO_TEMPLATE = {
-    "statement": "statement.md",
-    "sketch": "sketch.md",
+    "researcher": "researcher.md",
+    "mentor": "mentor.md",
     "prover": "prover.md",
     "editor_dispatch": "editor_dispatch.md",
     "editor_decision": "editor_decision.md",

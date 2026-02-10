@@ -25,17 +25,20 @@ python -m pipeline.runner --problem 5 --dry-run
 
 This is a multi-agent proof pipeline that iteratively generates and validates mathematical proofs using LLMs. The pipeline uses a **managing editor** model: agents generate a proof, reviewers evaluate it from multiple perspectives, and an editor synthesizes reviews into a three-way decision.
 
-### Per-Loop Flow
+### Pipeline Flow
 
-1. **Statement** — Formalizes the problem, normalizes notation
-2. **Sketch** — Proposes lemma-level strategy (skipped on `right_track` feedback)
-3. **Prover** — Writes complete proof with justified steps
-4. **Editor Dispatch** — Assigns pool reviewers to perspectives (LLM call)
-5. **Reviewers** — One per perspective, using assigned pool backends
-6. **Editor Decision** — Synthesizes reviews into a verdict (LLM call):
+0. **Researcher** (once, pre-loop) — Gathers relevant theorems, definitions, proof strategies, and identifies gaps in the background material. Output is passed to all loop agents as `{researcher_output}`.
+
+#### Per-Loop Flow
+
+1. **Mentor** — Formalizes the problem, normalizes notation, and proposes lemma-level proof strategy (skipped on `right_track` feedback)
+2. **Prover** — Writes complete proof with justified steps
+3. **Editor Dispatch** — Assigns pool reviewers to perspectives (LLM call)
+4. **Reviewers** — One per perspective, using assigned pool backends
+5. **Editor Decision** — Synthesizes reviews into a verdict (LLM call):
    - `accept`: proof passes, pipeline exits successfully
    - `right_track`: minor issues, feedback goes to prover next loop
-   - `wrong_track`: fundamental problems, feedback goes to sketch next loop
+   - `wrong_track`: fundamental problems, feedback goes to mentor next loop
 
 The loop repeats until the editor accepts or the loop budget (default 5) is exhausted. Exit codes: 0=accept, 1=not accepted after max loops, 2=input validation error, 3=backend/runtime error.
 
@@ -87,7 +90,7 @@ Each problem lives in a numbered directory (e.g., `5/`) containing `QUESTION.md`
 
 - **No external runtime dependencies** — all networking uses `urllib.request`
 - **Prompt templates** in `prompts/` use `{key}` placeholder syntax (not Jinja)
-- Agent roles are always one of: `"statement"`, `"sketch"`, `"prover"`, `"editor_dispatch"`, `"editor_decision"`, `"reviewer"`
+- Agent roles are always one of: `"researcher"`, `"mentor"`, `"prover"`, `"editor_dispatch"`, `"editor_decision"`, `"reviewer"`
 - Reviewer output must contain a JSON block in a fenced code block with structured issues
 - Editor decision output must contain a JSON block with verdict (`accept`/`right_track`/`wrong_track`), summary, and feedback
 - Data models are frozen dataclasses (immutable)

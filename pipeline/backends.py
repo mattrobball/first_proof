@@ -86,7 +86,19 @@ class DemoBackend:
         question_line = _first_non_empty_line(context.get("question_text", ""))
         editor_feedback = context.get("editor_feedback", "None.")
 
-        if role == "statement":
+        if role == "researcher":
+            return (
+                "## Relevant Theorems\n"
+                "- No specific theorems identified in demo mode.\n\n"
+                "## Key Definitions\n"
+                "- All definitions are assumed from BACKGROUND.md.\n\n"
+                "## Proof Strategies\n"
+                "- Direct proof from stated assumptions.\n\n"
+                "## Gaps and Concerns\n"
+                "- No gaps identified in demo mode.\n"
+            )
+
+        if role == "mentor":
             return (
                 "## Definitions\n"
                 "- `Problem`: the target claim from `QUESTION.md`.\n"
@@ -97,11 +109,7 @@ class DemoBackend:
                 "- Use only assumptions stated in the provided files.\n"
                 "- Every inference in the final proof must be justified.\n\n"
                 "## Notation\n"
-                "- Reuse notation from the problem where available.\n"
-            )
-
-        if role == "sketch":
-            return (
+                "- Reuse notation from the problem where available.\n\n"
                 "## High-Level Strategy\n"
                 "1. Translate the question into explicit hypotheses and conclusions.\n"
                 "2. Decompose the target into lemmas that can be proved from background facts.\n"

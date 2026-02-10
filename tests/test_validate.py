@@ -4,6 +4,7 @@ import pytest
 
 from pipeline.validate import (
     OutputValidationError,
+    ensure_required_sections,
     parse_editor_decision_output,
     parse_editor_dispatch_output,
     parse_reviewer_output,
@@ -243,3 +244,27 @@ def test_parse_editor_decision_non_accept_empty_feedback_rejected() -> None:
 def test_parse_editor_decision_missing_json() -> None:
     with pytest.raises(OutputValidationError, match="JSON"):
         parse_editor_decision_output("No json")
+
+
+# ---------------------------------------------------------------------------
+# ensure_required_sections — researcher
+# ---------------------------------------------------------------------------
+
+
+def test_researcher_required_sections_pass() -> None:
+    text = (
+        "## Relevant Theorems\n- T1\n\n"
+        "## Key Definitions\n- D1\n\n"
+        "## Proof Strategies\n- S1\n\n"
+        "## Gaps and Concerns\n- None\n"
+    )
+    ensure_required_sections("researcher", text)  # should not raise
+
+
+def test_researcher_required_sections_missing() -> None:
+    text = (
+        "## Relevant Theorems\n- T1\n\n"
+        "## Key Definitions\n- D1\n\n"
+    )
+    with pytest.raises(OutputValidationError, match="Proof Strategies"):
+        ensure_required_sections("researcher", text)

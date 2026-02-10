@@ -12,7 +12,22 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def _statement() -> str:
+def _researcher() -> str:
+    return """## Relevant Theorems
+- Theorem 1
+
+## Key Definitions
+- Def 1
+
+## Proof Strategies
+- Direct proof
+
+## Gaps and Concerns
+- None
+"""
+
+
+def _mentor() -> str:
     return """## Definitions
 - Def 1
 
@@ -24,11 +39,8 @@ Prove X.
 
 ## Notation
 - N1
-"""
 
-
-def _sketch() -> str:
-    return """## High-Level Strategy
+## High-Level Strategy
 Use lemmas.
 
 ## Key Lemmas
@@ -147,10 +159,10 @@ class EditorAwareBackend:
         self._decision_fn = decision_fn or (lambda ctx: _editor_decision_accept())
 
     def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
-        if role == "statement":
-            return _statement()
-        if role == "sketch":
-            return _sketch()
+        if role == "researcher":
+            return _researcher()
+        if role == "mentor":
+            return _mentor()
         if role == "prover":
             return _prover()
         if role == "editor_dispatch":
@@ -208,12 +220,12 @@ def test_right_track_feeds_back_to_prover(tmp_path: Path) -> None:
 
     assert result.final_verdict == "accept"
     assert result.executed_loops == 2
-    # Loop 2 should reuse loop 1's sketch (right_track -> prover)
-    assert result.loops[1].sketch_text == result.loops[0].sketch_text
+    # Loop 2 should reuse loop 1's mentor output (right_track -> prover)
+    assert result.loops[1].mentor_text == result.loops[0].mentor_text
 
 
-def test_wrong_track_feeds_back_to_sketch(tmp_path: Path) -> None:
-    """wrong_track should cause the sketch agent to regenerate."""
+def test_wrong_track_feeds_back_to_mentor(tmp_path: Path) -> None:
+    """wrong_track should cause the mentor agent to regenerate."""
     call_count = {"n": 0}
 
     def decision_fn(ctx):
@@ -231,7 +243,7 @@ def test_wrong_track_feeds_back_to_sketch(tmp_path: Path) -> None:
     assert result.executed_loops == 2
     # Loop 1 verdict should be wrong_track
     assert result.loops[0].editor_decision.verdict == "wrong_track"
-    assert result.loops[0].editor_decision.feedback_target == "sketch"
+    assert result.loops[0].editor_decision.feedback_target == "mentor"
 
 
 def test_stops_at_max_loops_on_right_track(tmp_path: Path) -> None:
@@ -343,3 +355,47 @@ def test_demo_backend_full_run(tmp_path: Path) -> None:
 
     assert result.final_verdict == "accept"
     assert result.executed_loops == 2
+
+
+def test_researcher_text_populated(tmp_path: Path) -> None:
+    """The researcher_text field should be populated after a pipeline run."""
+    problem_dir = _prepare_problem_dir(tmp_path)
+    config = PipelineConfig(max_loops=2, out_dir_name="runs")
+    result = run_pipeline(problem_dir, config, _make_router())
+
+    assert result.researcher_text
+    assert "## Relevant Theorems" in result.researcher_text
+    assert "## Key Definitions" in result.researcher_text
+    assert "## Proof Strategies" in result.researcher_text
+    assert "## Gaps and Concerns" in result.researcher_text
+
+
+def test_researcher_in_transcript(tmp_path: Path) -> None:
+    """The transcript should include a Researcher section."""
+    problem_dir = _prepare_problem_dir(tmp_path)
+    config = PipelineConfig(max_loops=2, out_dir_name="runs")
+    result = run_pipeline(problem_dir, config, _make_router())
+
+    transcript = result.transcript_path.read_text(encoding="utf-8")
+    assert "## Researcher" in transcript
+
+
+def test_researcher_in_latex(tmp_path: Path) -> None:
+    """The LaTeX output should include a Researcher Background section."""
+    problem_dir = _prepare_problem_dir(tmp_path)
+    config = PipelineConfig(max_loops=2, out_dir_name="runs")
+    result = run_pipeline(problem_dir, config, _make_router())
+
+    latex = result.latex_path.read_text(encoding="utf-8")
+    assert "Researcher Background" in latex
+
+
+def test_researcher_in_meta(tmp_path: Path) -> None:
+    """The meta JSON should include researcher_text."""
+    problem_dir = _prepare_problem_dir(tmp_path)
+    config = PipelineConfig(max_loops=2, out_dir_name="runs")
+    result = run_pipeline(problem_dir, config, _make_router())
+
+    meta = json.loads(result.meta_path.read_text(encoding="utf-8"))
+    assert "researcher_text" in meta
+    assert "Relevant Theorems" in meta["researcher_text"]

@@ -69,10 +69,8 @@ def _build_perspectives_description(
 def _format_loop_for_context(loop: LoopRecord) -> str:
     parts = [
         f"## Loop {loop.loop_index}\n"
-        "### Statement\n"
-        f"{loop.statement_text.strip()}\n"
-        "### Sketch\n"
-        f"{loop.sketch_text.strip()}\n"
+        "### Mentor\n"
+        f"{loop.mentor_text.strip()}\n"
         "### Prover\n"
         f"{loop.prover_text.strip()}\n"
     ]
@@ -95,6 +93,7 @@ def _build_context(
     max_loops: int,
     prior_transcript: str,
     editor_feedback: str,
+    researcher_output: str = "None.",
 ) -> dict[str, str]:
     return {
         "problem_id": problem_id,
@@ -105,6 +104,7 @@ def _build_context(
         "max_loops": str(max_loops),
         "prior_transcript": prior_transcript.strip() or "None.",
         "editor_feedback": editor_feedback,
+        "researcher_output": researcher_output,
     }
 
 
@@ -141,6 +141,17 @@ def run_pipeline(
     pool_desc = _build_pool_description(pool_names)
     persp_desc = _build_perspectives_description(perspective_pairs)
 
+    # --- Researcher (once, pre-loop) ---
+    researcher_context = {
+        "problem_id": problem_inputs.problem_id,
+        "question_text": problem_inputs.question_text,
+        "background_text": problem_inputs.background_text,
+        "rigor": config.rigor,
+    }
+    researcher_prompt = render_prompt("researcher", researcher_context)
+    researcher_text = backend.generate("researcher", researcher_prompt, researcher_context)
+    ensure_required_sections("researcher", researcher_text)
+
     for loop_index in range(1, config.max_loops + 1):
         base_context = _build_context(
             problem_id=problem_inputs.problem_id,
@@ -151,27 +162,21 @@ def run_pipeline(
             max_loops=config.max_loops,
             prior_transcript=prior_transcript,
             editor_feedback=editor_feedback,
+            researcher_output=researcher_text,
         )
 
-        # --- Statement (always runs) ---
-        statement_prompt = render_prompt("statement", base_context)
-        statement_text = backend.generate("statement", statement_prompt, base_context)
-        ensure_required_sections("statement", statement_text)
-
-        # --- Sketch (runs if first loop or wrong_track) ---
-        sketch_context = dict(base_context)
-        sketch_context["statement_output"] = statement_text
+        # --- Mentor (runs if first loop or wrong_track) ---
         if feedback_target != "prover":
-            sketch_prompt = render_prompt("sketch", sketch_context)
-            sketch_text = backend.generate("sketch", sketch_prompt, sketch_context)
-            ensure_required_sections("sketch", sketch_text)
+            mentor_prompt = render_prompt("mentor", base_context)
+            mentor_text = backend.generate("mentor", mentor_prompt, base_context)
+            ensure_required_sections("mentor", mentor_text)
         else:
-            # Reuse last sketch when feedback_target is prover (right_track)
-            sketch_text = loops[-1].sketch_text
+            # Reuse last mentor output when feedback_target is prover (right_track)
+            mentor_text = loops[-1].mentor_text
 
         # --- Prover ---
-        prover_context = dict(sketch_context)
-        prover_context["sketch_output"] = sketch_text
+        prover_context = dict(base_context)
+        prover_context["mentor_output"] = mentor_text
         prover_prompt = render_prompt("prover", prover_context)
         prover_text = backend.generate("prover", prover_prompt, prover_context)
         ensure_required_sections("prover", prover_text)
@@ -225,7 +230,7 @@ def run_pipeline(
         elif verdict == "right_track":
             feedback_target_str = "prover"
         else:
-            feedback_target_str = "sketch"
+            feedback_target_str = "mentor"
 
         editor_decision = EditorDecision(
             verdict=verdict,
@@ -237,8 +242,7 @@ def run_pipeline(
 
         loop = LoopRecord(
             loop_index=loop_index,
-            statement_text=statement_text,
-            sketch_text=sketch_text,
+            mentor_text=mentor_text,
             prover_text=prover_text,
             editor_dispatch=editor_dispatch,
             reviewer_texts=reviewer_texts,
@@ -270,6 +274,7 @@ def run_pipeline(
         executed_loops=len(loops),
         final_verdict=final_verdict,
         issue_counts=issue_counts,
+        researcher_text=researcher_text,
         loops=loops,
         transcript_path=transcript_path,
         meta_path=meta_path,
@@ -283,6 +288,7 @@ def run_pipeline(
         started_at=started_at,
         finished_at=finished_at,
         final_verdict=final_verdict,
+        researcher_text=researcher_text,
     )
     write_text(transcript_path, transcript_text)
 
@@ -293,6 +299,7 @@ def run_pipeline(
         started_at=started_at,
         finished_at=finished_at,
         final_verdict=final_verdict,
+        researcher_text=researcher_text,
     )
     write_text(latex_path, latex_text)
 
@@ -417,9 +424,9 @@ def main(argv: list[str] | None = None) -> int:
             max_loops=config.max_loops,
             prior_transcript="",
             editor_feedback="None.",
+            researcher_output="<dry-run researcher output placeholder>",
         )
-        dry_context["statement_output"] = "<dry-run statement output placeholder>"
-        dry_context["sketch_output"] = "<dry-run sketch output placeholder>"
+        dry_context["mentor_output"] = "<dry-run mentor output placeholder>"
         dry_context["prover_output"] = "<dry-run prover output placeholder>"
         dry_context["pool_description"] = "<dry-run pool description>"
         dry_context["perspectives_description"] = "<dry-run perspectives>"
@@ -429,7 +436,7 @@ def main(argv: list[str] | None = None) -> int:
         dry_context["reviews_markdown"] = "<dry-run reviews>"
         try:
             for role in (
-                "statement", "sketch", "prover",
+                "researcher", "mentor", "prover",
                 "editor_dispatch", "editor_decision", "reviewer",
             ):
                 _ = render_prompt(role, dry_context)

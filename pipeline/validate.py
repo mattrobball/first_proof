@@ -6,13 +6,17 @@ import re
 from .models import EditorDispatch, EditorVerdict, ReviewerIssue, ReviewerResult, Severity
 
 REQUIRED_HEADINGS: dict[str, list[str]] = {
-    "statement": [
+    "researcher": [
+        "## Relevant Theorems",
+        "## Key Definitions",
+        "## Proof Strategies",
+        "## Gaps and Concerns",
+    ],
+    "mentor": [
         "## Definitions",
         "## Formal Statement",
         "## Assumptions",
         "## Notation",
-    ],
-    "sketch": [
         "## High-Level Strategy",
         "## Key Lemmas",
         "## Dependency Graph",

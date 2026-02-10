@@ -18,7 +18,7 @@ Task:
 2. Render one of three verdicts:
    - **accept**: The proof is correct, complete, and meets the rigor target. No further changes needed.
    - **right_track**: The proof has the right overall approach but has issues that the prover can fix (missing details, minor gaps, notation problems).
-   - **wrong_track**: The proof has fundamental problems requiring a new strategy (wrong approach, invalid key lemma, incorrect theorem application). The sketch agent should redesign.
+   - **wrong_track**: The proof has fundamental problems requiring a new strategy (wrong approach, invalid key lemma, incorrect theorem application). The mentor agent should redesign.
 3. For non-accept verdicts, provide clear, actionable feedback for the target agent.
 
 Output requirements:
