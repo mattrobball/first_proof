@@ -272,7 +272,7 @@ def _approved_config(**pool_overrides: dict) -> PipelineFileConfig:
                 backend="cli", provider="claude", model="claude-opus-4-6",
             ),
             "gemini_reviewer": AgentModelConfig(
-                backend="api", provider="gemini", model="gemini-3.0-pro",
+                backend="api", provider="gemini", model="gemini-3-pro-preview",
             ),
             **pool_overrides,
         },
@@ -305,7 +305,7 @@ def test_unapproved_model_rejected() -> None:
 def test_all_pool_entries_validated() -> None:
     fc = _approved_config(
         bad_reviewer=AgentModelConfig(
-            backend="cli", provider="gemini", model="gemini-3.0-pro",
+            backend="cli", provider="gemini", model="gemini-3-pro-preview",
         ),
     )
     with pytest.raises(ValueError, match="reviewer_pool.bad_reviewer"):

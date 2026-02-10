@@ -19,4 +19,4 @@ reasoning_effort = "xhigh"
 [reviewer_pool.gemini_reviewer]
 backend  = "api"
 provider = "gemini"
-model    = "gemini-3.0-pro"
+model    = "gemini-3-pro-preview"

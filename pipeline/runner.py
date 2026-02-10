@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import os
+import re
 import sys
 from pathlib import Path
 
@@ -399,6 +401,23 @@ def _resolve_backend(
     )
 
 
+_EXPORT_RE = re.compile(
+    r'^export\s+([A-Za-z_][A-Za-z0-9_]*)=["\']?(.*?)["\']?\s*$'
+)
+
+
+def _load_secrets(*search_dirs: Path) -> None:
+    """Load ``export KEY=value`` lines from the first ``.secrets`` file found."""
+    for d in search_dirs:
+        secrets = d / ".secrets"
+        if secrets.is_file():
+            for line in secrets.read_text(encoding="utf-8").splitlines():
+                m = _EXPORT_RE.match(line)
+                if m:
+                    os.environ.setdefault(m.group(1), m.group(2))
+            return
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_argument_parser()
     args = parser.parse_args(argv)
@@ -414,6 +433,8 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     problem_dir = _resolve_problem_dir(args.problem)
+    _load_secrets(problem_dir, Path.cwd())
+
     try:
         config.validate()
         problem_inputs = load_problem_inputs(problem_dir)
