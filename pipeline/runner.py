@@ -119,6 +119,11 @@ def _aggregate_issue_counts(loops: list[LoopRecord]) -> dict[str, int]:
     return counts
 
 
+def _status(msg: str) -> None:
+    """Print a pipeline progress line to stderr."""
+    print(f"  {msg}", file=sys.stderr, flush=True)
+
+
 def run_pipeline(
     problem_dir: Path,
     config: PipelineConfig,
@@ -144,6 +149,7 @@ def run_pipeline(
     persp_desc = _build_perspectives_description(perspective_pairs)
 
     # --- Researcher (once, pre-loop) ---
+    _status("researcher ...")
     researcher_context = {
         "problem_id": problem_inputs.problem_id,
         "question_text": problem_inputs.question_text,
@@ -153,6 +159,7 @@ def run_pipeline(
     researcher_prompt = render_prompt("researcher", researcher_context)
     researcher_text = backend.generate("researcher", researcher_prompt, researcher_context)
     ensure_required_sections("researcher", researcher_text)
+    _status("researcher done")
 
     for loop_index in range(1, config.max_loops + 1):
         base_context = _build_context(
@@ -169,14 +176,17 @@ def run_pipeline(
 
         # --- Mentor (runs if first loop or wrong_track) ---
         if feedback_target != "prover":
+            _status(f"[loop {loop_index}/{config.max_loops}] mentor ...")
             mentor_prompt = render_prompt("mentor", base_context)
             mentor_text = backend.generate("mentor", mentor_prompt, base_context)
             ensure_required_sections("mentor", mentor_text)
         else:
+            _status(f"[loop {loop_index}/{config.max_loops}] mentor (reused — right_track)")
             # Reuse last mentor output when feedback_target is prover (right_track)
             mentor_text = loops[-1].mentor_text
 
         # --- Prover ---
+        _status(f"[loop {loop_index}/{config.max_loops}] prover ...")
         prover_context = dict(base_context)
         prover_context["mentor_output"] = mentor_text
         prover_prompt = render_prompt("prover", prover_context)
@@ -184,6 +194,7 @@ def run_pipeline(
         ensure_required_sections("prover", prover_text)
 
         # --- Editor dispatch ---
+        _status(f"[loop {loop_index}/{config.max_loops}] editor dispatch ...")
         dispatch_context = dict(prover_context)
         dispatch_context["prover_output"] = prover_text
         dispatch_context["pool_description"] = pool_desc
@@ -199,8 +210,14 @@ def run_pipeline(
         # --- Reviewers (one per perspective) ---
         reviewer_results: list[ReviewerResult] = []
         reviewer_texts: dict[str, str] = {}
-        for persp in config.reviewer_perspectives:
+        num_perspectives = len(config.reviewer_perspectives)
+        for persp_idx, persp in enumerate(config.reviewer_perspectives, 1):
             assigned_pool = editor_dispatch.assignments[persp.name]
+            _status(
+                f"[loop {loop_index}/{config.max_loops}] "
+                f"reviewer {persp_idx}/{num_perspectives} "
+                f"({assigned_pool} -> {persp.name}) ..."
+            )
             reviewer_context = dict(dispatch_context)
             reviewer_context["reviewer_name"] = assigned_pool
             reviewer_context["perspective_name"] = persp.name
@@ -218,6 +235,7 @@ def run_pipeline(
             reviewer_texts[persp.name] = reviewer_text
 
         # --- Editor decision ---
+        _status(f"[loop {loop_index}/{config.max_loops}] editor decision ...")
         reviews_md = _reviews_to_markdown(reviewer_results)
         decision_context = dict(dispatch_context)
         decision_context["reviews_markdown"] = reviews_md
@@ -226,6 +244,21 @@ def run_pipeline(
             "editor_decision", decision_prompt, decision_context
         )
         verdict, summary, feedback = parse_editor_decision_output(decision_text)
+
+        # --- Editor summary (shown to user) ---
+        issue_summary = ", ".join(
+            f"{sum(1 for rr in reviewer_results for i in rr.issues if i.severity == s)} {s}"
+            for s in ("critical", "major", "minor")
+            if any(i.severity == s for rr in reviewer_results for i in rr.issues)
+        ) or "no issues"
+        _status("")
+        _status(f"--- Managing Editor — Loop {loop_index}/{config.max_loops} ---")
+        _status(f"Verdict: {verdict}")
+        _status(f"Issues:  {issue_summary}")
+        _status(f"Summary: {summary}")
+        if feedback:
+            _status(f"Feedback: {feedback}")
+        _status("")
 
         if verdict == "accept":
             feedback_target_str = ""
