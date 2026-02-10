@@ -516,6 +516,10 @@ _NON_REVIEWER_ROLES = (
     "researcher", "mentor", "prover", "editor_dispatch", "editor_decision",
 )
 
+# Backend types that only handle the "reviewer" role and must be excluded
+# from the randomize_agents pool (which assigns non-reviewer roles).
+_REVIEWER_ONLY_BACKENDS = frozenset({"self_citer", "extension_requester"})
+
 
 def build_backend_from_config(
     file_config: PipelineFileConfig,
@@ -548,18 +552,22 @@ def build_backend_from_config(
     assignments: dict[str, str] = {}
 
     if file_config.randomize_agents:
-        # Build named pool: defaults + reviewer_pool entries
+        # Build named pool: defaults + reviewer_pool entries, excluding
+        # reviewer-only backends that cannot serve non-reviewer roles.
         named_configs: dict[str, AgentModelConfig] = {
             "defaults": file_config.defaults,
-            **file_config.reviewer_pool,
         }
+        for pn, cfg in file_config.reviewer_pool.items():
+            if cfg.backend.lower() not in _REVIEWER_ONLY_BACKENDS:
+                named_configs[pn] = cfg
         pool_names = sorted(named_configs)
         rng = random.Random(seed)
 
         # Pre-build backends for each named config (reuse existing where possible)
         named_backends: dict[str, AgentBackend] = {"defaults": default_backend}
         for pn in file_config.reviewer_pool:
-            named_backends[pn] = pool_backends[pn]
+            if pn in named_configs:
+                named_backends[pn] = pool_backends[pn]
 
         for role in _NON_REVIEWER_ROLES:
             if role in file_config.agents:
