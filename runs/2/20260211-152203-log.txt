@@ -1,0 +1,3 @@
+  [+00:00] [loop 1] shuffled: editor_decision->codex_cli, editor_dispatch->gemini_api, mentor->codex_cli, prover->gemini_api, researcher->claude_code
+  [+00:00] researcher -> gemini_api
+  [+00:00] [loop 1/5] researcher ...

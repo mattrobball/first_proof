@@ -1,0 +1,3 @@
+  [+00:00] [loop 1] shuffled: editor_decision->claude_code, editor_dispatch->codex_cli, mentor->claude_code, prover->codex_cli, researcher->claude_code
+  [+00:00] researcher -> claude_code
+  [+00:00] [loop 1/5] researcher ...
