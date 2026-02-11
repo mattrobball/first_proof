@@ -150,10 +150,9 @@ def format_timestamp(ts: datetime) -> str:
     return ts.astimezone(timezone.utc).strftime("%Y%m%d-%H%M%S")
 
 
-def ensure_output_dir(problem_dir: Path, out_dir_name: str) -> Path:
-    out_dir = problem_dir / out_dir_name
-    out_dir.mkdir(parents=True, exist_ok=True)
-    return out_dir
+def ensure_output_dir(problem_dir: Path) -> Path:
+    problem_dir.mkdir(parents=True, exist_ok=True)
+    return problem_dir
 
 
 def build_transcript(

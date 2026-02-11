@@ -193,7 +193,7 @@ def _prepare_problem_dir(tmp_path: Path) -> Path:
 
 def test_stops_early_on_accept(tmp_path: Path) -> None:
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=5, out_dir_name="runs")
+    config = PipelineConfig(max_loops=5)
     result = run_pipeline(problem_dir, config, _make_router())
 
     assert result.final_verdict == "accept"
@@ -214,7 +214,7 @@ def test_right_track_feeds_back_to_prover(tmp_path: Path) -> None:
         return _editor_decision_accept()
 
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=5, out_dir_name="runs")
+    config = PipelineConfig(max_loops=5)
     backend = EditorAwareBackend(decision_fn=decision_fn)
     result = run_pipeline(problem_dir, config, _make_router(backend))
 
@@ -235,7 +235,7 @@ def test_wrong_track_feeds_back_to_mentor(tmp_path: Path) -> None:
         return _editor_decision_accept()
 
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=5, out_dir_name="runs")
+    config = PipelineConfig(max_loops=5)
     backend = EditorAwareBackend(decision_fn=decision_fn)
     result = run_pipeline(problem_dir, config, _make_router(backend))
 
@@ -248,7 +248,7 @@ def test_wrong_track_feeds_back_to_mentor(tmp_path: Path) -> None:
 
 def test_stops_at_max_loops_on_right_track(tmp_path: Path) -> None:
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=3, out_dir_name="runs")
+    config = PipelineConfig(max_loops=3)
     backend = EditorAwareBackend(
         reviewer_fn=lambda ctx: _reviewer_fail(),
         decision_fn=lambda ctx: _editor_decision_right_track(),
@@ -261,7 +261,7 @@ def test_stops_at_max_loops_on_right_track(tmp_path: Path) -> None:
 
 def test_transcript_and_meta_content(tmp_path: Path) -> None:
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=2, out_dir_name="runs")
+    config = PipelineConfig(max_loops=2)
     result = run_pipeline(problem_dir, config, _make_router())
 
     transcript = result.transcript_path.read_text(encoding="utf-8")
@@ -279,7 +279,7 @@ def test_transcript_and_meta_content(tmp_path: Path) -> None:
 
 def test_editor_decision_in_meta(tmp_path: Path) -> None:
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=2, out_dir_name="runs")
+    config = PipelineConfig(max_loops=2)
     result = run_pipeline(problem_dir, config, _make_router())
 
     meta = json.loads(result.meta_path.read_text(encoding="utf-8"))
@@ -293,7 +293,7 @@ def test_editor_decision_in_meta(tmp_path: Path) -> None:
 def test_reviewer_results_recorded(tmp_path: Path) -> None:
     """Each reviewer result should have the correct perspective_name."""
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=1, out_dir_name="runs")
+    config = PipelineConfig(max_loops=1)
     backend = EditorAwareBackend(
         reviewer_fn=lambda ctx: _reviewer_fail(),
         decision_fn=lambda ctx: _editor_decision_right_track(),
@@ -313,7 +313,7 @@ def test_reviewer_results_recorded(tmp_path: Path) -> None:
 
 def test_latex_output_generated(tmp_path: Path) -> None:
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=2, out_dir_name="runs")
+    config = PipelineConfig(max_loops=2)
     result = run_pipeline(problem_dir, config, _make_router())
 
     assert result.latex_path.exists()
@@ -329,7 +329,7 @@ def test_latex_output_generated(tmp_path: Path) -> None:
 
 def test_latex_contains_suggestions_on_fail(tmp_path: Path) -> None:
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=1, out_dir_name="runs")
+    config = PipelineConfig(max_loops=1)
     backend = EditorAwareBackend(
         reviewer_fn=lambda ctx: _reviewer_fail(),
         decision_fn=lambda ctx: _editor_decision_right_track(),
@@ -344,7 +344,7 @@ def test_latex_contains_suggestions_on_fail(tmp_path: Path) -> None:
 def test_demo_backend_full_run(tmp_path: Path) -> None:
     """The DemoBackend should complete a full run with the editor flow."""
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=5, out_dir_name="runs")
+    config = PipelineConfig(max_loops=5)
     demo = DemoBackend()
     router = BackendRouter(
         role_backends={},
@@ -360,7 +360,7 @@ def test_demo_backend_full_run(tmp_path: Path) -> None:
 def test_researcher_text_populated(tmp_path: Path) -> None:
     """The researcher_text field should be populated after a pipeline run."""
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=2, out_dir_name="runs")
+    config = PipelineConfig(max_loops=2)
     result = run_pipeline(problem_dir, config, _make_router())
 
     assert result.researcher_text
@@ -376,7 +376,7 @@ def test_researcher_text_populated(tmp_path: Path) -> None:
 def test_researcher_in_transcript(tmp_path: Path) -> None:
     """The transcript should include a Researcher Agent section inside each loop."""
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=2, out_dir_name="runs")
+    config = PipelineConfig(max_loops=2)
     result = run_pipeline(problem_dir, config, _make_router())
 
     transcript = result.transcript_path.read_text(encoding="utf-8")
@@ -386,7 +386,7 @@ def test_researcher_in_transcript(tmp_path: Path) -> None:
 def test_researcher_in_latex(tmp_path: Path) -> None:
     """The LaTeX output should include a Researcher subsection inside each loop."""
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=2, out_dir_name="runs")
+    config = PipelineConfig(max_loops=2)
     result = run_pipeline(problem_dir, config, _make_router())
 
     latex = result.latex_path.read_text(encoding="utf-8")
@@ -396,7 +396,7 @@ def test_researcher_in_latex(tmp_path: Path) -> None:
 def test_researcher_in_meta(tmp_path: Path) -> None:
     """The meta JSON should include researcher_text."""
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=2, out_dir_name="runs")
+    config = PipelineConfig(max_loops=2)
     result = run_pipeline(problem_dir, config, _make_router())
 
     meta = json.loads(result.meta_path.read_text(encoding="utf-8"))
