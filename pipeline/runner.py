@@ -12,6 +12,12 @@ from typing import TextIO
 from .agent_config import find_config_file, load_config_file, validate_approved_backends
 from .agents import render_prompt
 from .backends import BackendRouter, build_backend, build_backend_from_config
+from .checkpoint import (
+    CheckpointData,
+    load_checkpoint,
+    validate_checkpoint_inputs,
+    write_checkpoint,
+)
 from .config import PipelineConfig
 from .io import (
     InputValidationError,
@@ -180,25 +186,42 @@ def run_pipeline(
     problem_dir: Path,
     config: PipelineConfig,
     backend: BackendRouter,
+    resume_checkpoint: CheckpointData | None = None,
 ) -> PipelineRunResult:
     global _pipeline_t0, _pipeline_log
     _pipeline_t0 = time.monotonic()
 
     config.validate()
     problem_inputs = load_problem_inputs(problem_dir)
-    started_dt = utc_now()
-    started_at = started_dt.isoformat()
+
+    if resume_checkpoint is not None:
+        started_at = resume_checkpoint.started_at
+        timestamp = resume_checkpoint.timestamp
+        loops = list(resume_checkpoint.loops)
+        prior_transcript = "\n".join(
+            _format_loop_for_context(l) for l in loops
+        )
+        editor_feedback = resume_checkpoint.editor_feedback
+        feedback_target = resume_checkpoint.feedback_target
+        resume_from = len(loops) + 1
+    else:
+        started_dt = utc_now()
+        started_at = started_dt.isoformat()
+        timestamp = format_timestamp(started_dt)
+        loops = []
+        prior_transcript = ""
+        editor_feedback = "None."
+        feedback_target = ""
+        resume_from = 1
 
     # Open a run log file alongside the other artifacts
-    timestamp = format_timestamp(started_dt)
     out_dir = ensure_output_dir(problem_dir, config.out_dir_name)
     log_path = out_dir / f"{timestamp}-log.txt"
-    _pipeline_log = open(log_path, "w", encoding="utf-8")  # noqa: SIM115
+    log_mode = "a" if resume_checkpoint is not None else "w"
+    _pipeline_log = open(log_path, log_mode, encoding="utf-8")  # noqa: SIM115
 
-    loops: list[LoopRecord] = []
-    prior_transcript = ""
-    editor_feedback = "None."
-    feedback_target = ""
+    if resume_checkpoint is not None:
+        _status(f"--- RESUMED from loop {resume_from - 1} ---")
 
     pool_names = sorted(backend.pool_backends)
     perspective_pairs = [
@@ -209,9 +232,9 @@ def run_pipeline(
     pool_desc = _build_pool_description(pool_names)
     persp_desc = _build_perspectives_description(perspective_pairs)
 
-    researcher_text = ""
+    researcher_text = loops[-1].researcher_text if loops else ""
 
-    for loop_index in range(1, config.max_loops + 1):
+    for loop_index in range(resume_from, config.max_loops + 1):
         _log_shuffle(backend.shuffle(), f"loop {loop_index}")
         base_context = _build_context(
             problem_id=problem_inputs.problem_id,
@@ -414,6 +437,21 @@ def run_pipeline(
         loops.append(loop)
         prior_transcript += "\n" + _format_loop_for_context(loop)
 
+        write_checkpoint(
+            out_dir=out_dir,
+            timestamp=timestamp,
+            problem_id=problem_inputs.problem_id,
+            started_at=started_at,
+            max_loops=config.max_loops,
+            input_hashes={
+                "question_sha256": problem_inputs.question_hash,
+                "background_sha256": problem_inputs.background_hash,
+            },
+            loops=loops,
+            editor_feedback=feedback if verdict != "accept" else "None.",
+            feedback_target=feedback_target_str,
+        )
+
         if verdict == "accept":
             break
         editor_feedback = feedback
@@ -526,6 +564,15 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Validate problem inputs and prompt rendering only.",
     )
+    parser.add_argument(
+        "--resume",
+        default=None,
+        metavar="CHECKPOINT",
+        help=(
+            "Resume from a checkpoint file. Accepts a full path, a timestamp "
+            "string, or a prefix to match in <problem>/runs/."
+        ),
+    )
     return parser
 
 
@@ -534,6 +581,44 @@ def _resolve_problem_dir(problem: str) -> Path:
     if candidate.exists():
         return candidate
     return Path.cwd() / problem
+
+
+def _resolve_checkpoint(value: str, problem_dir: Path, out_dir_name: str) -> Path:
+    """Resolve a --resume value to a checkpoint file path.
+
+    Accepts a full path, a bare timestamp, or a prefix to match in the
+    problem's output directory.
+    """
+    # Direct path
+    candidate = Path(value)
+    if candidate.is_file():
+        return candidate
+
+    # Search in the problem's runs directory
+    runs_dir = problem_dir / out_dir_name
+    if not runs_dir.is_dir():
+        raise FileNotFoundError(
+            f"No runs directory at {runs_dir}"
+        )
+
+    # Exact timestamp match
+    exact = runs_dir / f"{value}-checkpoint.json"
+    if exact.is_file():
+        return exact
+
+    # Prefix match
+    matches = sorted(runs_dir.glob(f"{value}*-checkpoint.json"))
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        names = [m.name for m in matches]
+        raise FileNotFoundError(
+            f"Ambiguous checkpoint prefix '{value}', matches: {names}"
+        )
+
+    raise FileNotFoundError(
+        f"No checkpoint file found for '{value}' in {runs_dir}"
+    )
 
 
 def _resolve_backend(
@@ -613,6 +698,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[error] {exc}", file=sys.stderr)
         return 2
 
+    if args.resume and args.dry_run:
+        print("[error] --resume and --dry-run cannot be used together", file=sys.stderr)
+        return 2
+
     if args.dry_run:
         dry_context = _build_context(
             problem_id=problem_inputs.problem_id,
@@ -649,9 +738,29 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     try:
+        resume_data: CheckpointData | None = None
+        if args.resume:
+            cp_path = _resolve_checkpoint(args.resume, problem_dir, config.out_dir_name)
+            resume_data = load_checkpoint(cp_path)
+            validate_checkpoint_inputs(
+                resume_data, problem_inputs.question_hash, problem_inputs.background_hash
+            )
+            print(
+                f"[info] Resuming from {cp_path.name} "
+                f"(loop {len(resume_data.loops)})",
+                file=sys.stderr,
+            )
         backend = _resolve_backend(config, problem_dir)
-        result = run_pipeline(problem_dir=problem_dir, config=config, backend=backend)
-    except (OutputValidationError, ValueError, RuntimeError, InputValidationError) as exc:
+        result = run_pipeline(
+            problem_dir=problem_dir,
+            config=config,
+            backend=backend,
+            resume_checkpoint=resume_data,
+        )
+    except (
+        OutputValidationError, ValueError, RuntimeError,
+        InputValidationError, FileNotFoundError,
+    ) as exc:
         print(f"[error] {exc}", file=sys.stderr)
         return 3
 
