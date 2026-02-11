@@ -251,9 +251,6 @@ def run_pipeline(
         )
 
         # --- Researcher ---
-        researcher_pick = backend.pick_role("researcher")
-        if researcher_pick:
-            _status(f"researcher -> {researcher_pick}")
         _status(f"[loop {loop_index}/{config.max_loops}] researcher ...")
         researcher_prompt = render_prompt("researcher", base_context)
         researcher_text = backend.generate("researcher", researcher_prompt, base_context)

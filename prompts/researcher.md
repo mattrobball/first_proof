@@ -22,6 +22,7 @@ Task:
 2. Clarify key definitions needed for a rigorous proof at the specified rigor level.
 3. Survey known proof strategies or techniques that could apply.
 4. Identify gaps, unstated assumptions, or missing context in the background material.
+5. If prior reviews flagged citation, reference validity, or sourcing issues, verify the cited results and provide correct statements, proper references, and any conditions or hypotheses that must hold.
 
 Output requirements:
 - Return valid Markdown.
