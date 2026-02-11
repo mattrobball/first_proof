@@ -39,7 +39,6 @@ DEFAULT_REVIEWER_PERSPECTIVES: list[ReviewerPerspective] = [
 class PipelineConfig:
     max_loops: int = 5
     rigor: str = "graduate"
-    out_dir_name: str = "runs"
     backend: str = "codex"
     model: str | None = None
     seed: int | None = None
@@ -51,7 +50,5 @@ class PipelineConfig:
             raise ValueError("max_loops must be at least 1")
         if not self.rigor.strip():
             raise ValueError("rigor must be non-empty")
-        if not self.out_dir_name.strip():
-            raise ValueError("out_dir_name must be non-empty")
         if not self.reviewer_perspectives:
             raise ValueError("reviewer_perspectives must be non-empty")

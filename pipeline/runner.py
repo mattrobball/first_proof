@@ -217,7 +217,7 @@ def run_pipeline(
         resume_from = 1
 
     # Open a run log file alongside the other artifacts
-    out_dir = ensure_output_dir(problem_dir, config.out_dir_name)
+    out_dir = ensure_output_dir(problem_dir)
     log_path = out_dir / f"{timestamp}-log.txt"
     log_mode = "a" if resume_checkpoint is not None else "w"
     _pipeline_log = open(log_path, log_mode, encoding="utf-8")  # noqa: SIM115
@@ -531,11 +531,6 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         help="Rigor target label included in prompts.",
     )
     parser.add_argument(
-        "--out-dir",
-        default="runs",
-        help="Output directory name inside the problem folder.",
-    )
-    parser.add_argument(
         "--backend",
         default="codex",
         choices=["codex", "demo"],
@@ -572,7 +567,7 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         metavar="CHECKPOINT",
         help=(
             "Resume from a checkpoint file. Accepts a full path, a timestamp "
-            "string, or a prefix to match in <problem>/runs/."
+            "string, or a prefix to match in the problem directory."
         ),
     )
     return parser
@@ -582,34 +577,36 @@ def _resolve_problem_dir(problem: str) -> Path:
     candidate = Path(problem)
     if candidate.exists():
         return candidate
-    return Path.cwd() / problem
+    runs_candidate = Path.cwd() / "runs" / problem
+    if runs_candidate.exists():
+        return runs_candidate
+    # Default: create under runs/
+    return Path.cwd() / "runs" / problem
 
 
-def _resolve_checkpoint(value: str, problem_dir: Path, out_dir_name: str) -> Path:
+def _resolve_checkpoint(value: str, problem_dir: Path) -> Path:
     """Resolve a --resume value to a checkpoint file path.
 
     Accepts a full path, a bare timestamp, or a prefix to match in the
-    problem's output directory.
+    problem directory.
     """
     # Direct path
     candidate = Path(value)
     if candidate.is_file():
         return candidate
 
-    # Search in the problem's runs directory
-    runs_dir = problem_dir / out_dir_name
-    if not runs_dir.is_dir():
+    if not problem_dir.is_dir():
         raise FileNotFoundError(
-            f"No runs directory at {runs_dir}"
+            f"No problem directory at {problem_dir}"
         )
 
     # Exact timestamp match
-    exact = runs_dir / f"{value}-checkpoint.json"
+    exact = problem_dir / f"{value}-checkpoint.json"
     if exact.is_file():
         return exact
 
     # Prefix match
-    matches = sorted(runs_dir.glob(f"{value}*-checkpoint.json"))
+    matches = sorted(problem_dir.glob(f"{value}*-checkpoint.json"))
     if len(matches) == 1:
         return matches[0]
     if len(matches) > 1:
@@ -619,7 +616,7 @@ def _resolve_checkpoint(value: str, problem_dir: Path, out_dir_name: str) -> Pat
         )
 
     raise FileNotFoundError(
-        f"No checkpoint file found for '{value}' in {runs_dir}"
+        f"No checkpoint file found for '{value}' in {problem_dir}"
     )
 
 
@@ -682,7 +679,6 @@ def main(argv: list[str] | None = None) -> int:
     config = PipelineConfig(
         max_loops=args.max_loops,
         rigor=args.rigor,
-        out_dir_name=args.out_dir,
         backend=args.backend,
         model=args.model,
         seed=args.seed,
@@ -742,7 +738,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         resume_data: CheckpointData | None = None
         if args.resume:
-            cp_path = _resolve_checkpoint(args.resume, problem_dir, config.out_dir_name)
+            cp_path = _resolve_checkpoint(args.resume, problem_dir)
             resume_data = load_checkpoint(cp_path)
             validate_checkpoint_inputs(
                 resume_data, problem_inputs.question_hash, problem_inputs.background_hash

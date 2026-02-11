@@ -196,11 +196,10 @@ def test_validate_checkpoint_inputs_background_changed() -> None:
 def test_pipeline_creates_checkpoint(tmp_path: Path) -> None:
     """A normal pipeline run should create a checkpoint file."""
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=5, out_dir_name="runs")
+    config = PipelineConfig(max_loops=5)
     result = run_pipeline(problem_dir, config, _make_router())
 
-    runs_dir = problem_dir / "runs"
-    checkpoints = list(runs_dir.glob("*-checkpoint.json"))
+    checkpoints = list(problem_dir.glob("*-checkpoint.json"))
     assert len(checkpoints) == 1
     cp = load_checkpoint(checkpoints[0])
     assert len(cp.loops) == result.executed_loops
@@ -217,7 +216,7 @@ def test_resume_skips_completed_loops(tmp_path: Path) -> None:
         return _editor_decision_accept()
 
     problem_dir = _prepare_problem_dir(tmp_path)
-    config = PipelineConfig(max_loops=5, out_dir_name="runs")
+    config = PipelineConfig(max_loops=5)
     backend = EditorAwareBackend(
         reviewer_fn=lambda ctx: _reviewer_fail(),
         decision_fn=decision_fn,
@@ -231,7 +230,7 @@ def test_resume_skips_completed_loops(tmp_path: Path) -> None:
 
     # Now simulate a crash after loop 2 by loading the checkpoint,
     # then building a new one with only the first 2 loops
-    checkpoints = list((problem_dir / "runs").glob("*-checkpoint.json"))
+    checkpoints = list(problem_dir.glob("*-checkpoint.json"))
     full_cp = load_checkpoint(checkpoints[0])
     # Truncate to first 2 loops to simulate crash before loop 3
     partial_cp = CheckpointData(
