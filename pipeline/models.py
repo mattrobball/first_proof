@@ -40,6 +40,16 @@ class ReviewerIssue:
             "suggestion": self.suggestion,
         }
 
+    @classmethod
+    def from_dict(cls, d: dict[str, object]) -> ReviewerIssue:
+        return cls(
+            severity=d["severity"],  # type: ignore[arg-type]
+            location=str(d["location"]),
+            reason=str(d["reason"]),
+            required_fix=str(d["required_fix"]),
+            suggestion=str(d["suggestion"]),
+        )
+
 
 @dataclass(frozen=True)
 class ReviewerResult:
@@ -56,6 +66,15 @@ class ReviewerResult:
             "residual_concerns": self.residual_concerns,
         }
 
+    @classmethod
+    def from_dict(cls, d: dict[str, object]) -> ReviewerResult:
+        return cls(
+            reviewer_name=str(d["reviewer_name"]),
+            perspective_name=str(d["perspective_name"]),
+            issues=[ReviewerIssue.from_dict(i) for i in d["issues"]],  # type: ignore[union-attr]
+            residual_concerns=list(d.get("residual_concerns") or []),  # type: ignore[arg-type]
+        )
+
 
 @dataclass(frozen=True)
 class EditorDispatch:
@@ -67,6 +86,13 @@ class EditorDispatch:
             "assignments": self.assignments,
             "reasoning": self.reasoning,
         }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, object]) -> EditorDispatch:
+        return cls(
+            assignments=dict(d["assignments"]),  # type: ignore[arg-type]
+            reasoning=str(d["reasoning"]),
+        )
 
 
 @dataclass(frozen=True)
@@ -86,6 +112,19 @@ class EditorDecision:
             "reviewer_results": [rr.to_dict() for rr in self.reviewer_results],
         }
 
+    @classmethod
+    def from_dict(cls, d: dict[str, object]) -> EditorDecision:
+        return cls(
+            verdict=d["verdict"],  # type: ignore[arg-type]
+            summary=str(d["summary"]),
+            feedback=str(d["feedback"]),
+            feedback_target=str(d.get("feedback_target", "")),
+            reviewer_results=[
+                ReviewerResult.from_dict(rr)  # type: ignore[arg-type]
+                for rr in d["reviewer_results"]  # type: ignore[union-attr]
+            ],
+        )
+
 
 @dataclass(frozen=True)
 class LoopRecord:
@@ -96,6 +135,29 @@ class LoopRecord:
     editor_dispatch: EditorDispatch
     reviewer_texts: dict[str, str]
     editor_decision: EditorDecision
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "loop_index": self.loop_index,
+            "researcher_text": self.researcher_text,
+            "mentor_text": self.mentor_text,
+            "prover_text": self.prover_text,
+            "editor_dispatch": self.editor_dispatch.to_dict(),
+            "reviewer_texts": self.reviewer_texts,
+            "editor_decision": self.editor_decision.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, object]) -> LoopRecord:
+        return cls(
+            loop_index=int(d["loop_index"]),  # type: ignore[arg-type]
+            researcher_text=str(d["researcher_text"]),
+            mentor_text=str(d["mentor_text"]),
+            prover_text=str(d["prover_text"]),
+            editor_dispatch=EditorDispatch.from_dict(d["editor_dispatch"]),  # type: ignore[arg-type]
+            reviewer_texts=dict(d["reviewer_texts"]),  # type: ignore[arg-type]
+            editor_decision=EditorDecision.from_dict(d["editor_decision"]),  # type: ignore[arg-type]
+        )
 
 
 @dataclass(frozen=True)

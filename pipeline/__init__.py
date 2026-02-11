@@ -5,6 +5,7 @@ __all__ = [
     "agents",
     "api_backends",
     "backends",
+    "checkpoint",
     "cli_backends",
     "config",
     "io",
