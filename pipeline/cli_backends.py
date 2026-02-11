@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .agent_config import AgentModelConfig
+from .cost import estimate_tokens, tracker as _cost_tracker
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +144,13 @@ class CodexCLIBackend:
             )
 
     def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
-        return self._run_codex(role, prompt, self.target_reasoning_effort)
+        response = self._run_codex(role, prompt, self.target_reasoning_effort)
+        _cost_tracker.record(
+            self.cfg.provider, self.cfg.model or "",
+            estimate_tokens(prompt), estimate_tokens(response),
+            estimated=True,
+        )
+        return response
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +204,11 @@ class ClaudeCLIBackend:
         if proc.returncode == 0:
             text = proc.stdout.strip()
             if text:
+                _cost_tracker.record(
+                    self.cfg.provider, self.cfg.model or "",
+                    estimate_tokens(prompt), estimate_tokens(text),
+                    estimated=True,
+                )
                 return text
             raise RuntimeError(
                 f"Claude CLI returned empty output for role '{role}'"
@@ -247,6 +259,11 @@ class GenericCLIBackend:
         if proc.returncode == 0:
             text = proc.stdout.strip()
             if text:
+                _cost_tracker.record(
+                    self.cfg.provider, self.cfg.model or "",
+                    estimate_tokens(prompt), estimate_tokens(text),
+                    estimated=True,
+                )
                 return text
             raise RuntimeError(
                 f"CLI backend '{self.cfg.cli_command}' returned empty output "

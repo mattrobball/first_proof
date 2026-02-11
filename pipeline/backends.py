@@ -22,6 +22,7 @@ from typing import Protocol
 from .agent_config import AgentModelConfig, PipelineFileConfig
 from .api_backends import build_api_backend
 from .cli_backends import build_cli_backend
+from .cost import estimate_tokens, tracker as _cost_tracker
 
 
 # ---------------------------------------------------------------------------
@@ -389,7 +390,13 @@ class CodexCLIBackend:
             )
 
     def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
-        return self._run_codex(role, prompt, self.target_reasoning_effort)
+        response = self._run_codex(role, prompt, self.target_reasoning_effort)
+        _cost_tracker.record(
+            "codex", self.model or "",
+            estimate_tokens(prompt), estimate_tokens(response),
+            estimated=True,
+        )
+        return response
 
 
 # ---------------------------------------------------------------------------

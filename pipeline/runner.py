@@ -19,6 +19,7 @@ from .checkpoint import (
     write_checkpoint,
 )
 from .config import PipelineConfig
+from .cost import tracker as _cost_tracker
 from .io import (
     InputValidationError,
     build_latex,
@@ -190,6 +191,7 @@ def run_pipeline(
 ) -> PipelineRunResult:
     global _pipeline_t0, _pipeline_log
     _pipeline_t0 = time.monotonic()
+    _cost_tracker.reset()
 
     config.validate()
     problem_inputs = load_problem_inputs(problem_dir)
@@ -767,6 +769,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[ok] Problem: {result.problem_id}")
     print(f"[ok] Loops: {result.executed_loops}/{result.max_loops}")
     print(f"[ok] Verdict: {result.final_verdict}")
+    print(f"[ok] Cost: {_cost_tracker.summary_line()}")
     print(f"[ok] Transcript: {result.transcript_path}")
     print(f"[ok] LaTeX: {result.latex_path}")
     print(f"[ok] Meta: {result.meta_path}")
