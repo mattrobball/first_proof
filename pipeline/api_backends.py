@@ -15,12 +15,18 @@ are no third-party dependencies.
 
 from __future__ import annotations
 
+import http.client
 import json
+import sys
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
 from .agent_config import AgentModelConfig, _PROVIDER_DEFAULTS
+
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 2.0  # seconds; doubles each attempt
 
 
 # ---------------------------------------------------------------------------
@@ -31,25 +37,45 @@ def _post_json(
     url: str,
     headers: dict[str, str],
     body: dict,
-    timeout: int,
 ) -> dict:
-    """Send a JSON POST request and return the parsed response."""
+    """Send a JSON POST request and return the parsed response.
+
+    Retries up to ``_MAX_RETRIES`` times on transient connection errors
+    (``RemoteDisconnected``, ``ConnectionResetError``, etc.) with exponential
+    backoff.
+    """
     data = json.dumps(body).encode()
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode())
-    except urllib.error.HTTPError as exc:
-        error_body = ""
+    last_exc: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
         try:
-            error_body = exc.read().decode()[:2000]
-        except Exception:
-            pass
-        raise RuntimeError(
-            f"API request failed ({exc.code}): {error_body}"
-        ) from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Network error: {exc.reason}") from exc
+            with urllib.request.urlopen(req) as resp:
+                return json.loads(resp.read().decode())
+        except urllib.error.HTTPError as exc:
+            error_body = ""
+            try:
+                error_body = exc.read().decode()[:2000]
+            except Exception:
+                pass
+            raise RuntimeError(
+                f"API request failed ({exc.code}): {error_body}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            # URLError wraps socket-level errors; retry on transient ones
+            if isinstance(exc.reason, (ConnectionResetError, http.client.RemoteDisconnected)):
+                last_exc = exc
+            else:
+                raise RuntimeError(f"Network error: {exc.reason}") from exc
+        except (ConnectionError, http.client.RemoteDisconnected, OSError) as exc:
+            last_exc = exc
+        delay = _RETRY_BASE_DELAY * (2 ** attempt)
+        print(
+            f"  [retry] transient network error (attempt {attempt + 1}/{_MAX_RETRIES}): "
+            f"{last_exc!r} — retrying in {delay:.0f}s",
+            file=sys.stderr, flush=True,
+        )
+        time.sleep(delay)
+    raise RuntimeError(f"Network error after {_MAX_RETRIES} retries: {last_exc}") from last_exc
 
 
 # ---------------------------------------------------------------------------
@@ -69,15 +95,15 @@ class AnthropicBackend:
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
         }
-        body = {
+        body: dict = {
             "model": self.cfg.model,
-            "max_tokens": self.cfg.max_tokens,
+            "max_tokens": self.cfg.max_tokens or 16384,
             "messages": [{"role": "user", "content": prompt}],
         }
         if self.cfg.temperature is not None:
             body["temperature"] = self.cfg.temperature
 
-        resp = _post_json(url, headers, body, self.cfg.timeout)
+        resp = _post_json(url, headers, body)
 
         content_blocks = resp.get("content", [])
         texts = [b["text"] for b in content_blocks if b.get("type") == "text"]
@@ -114,7 +140,7 @@ class OpenAIBackend:
         if self.cfg.temperature is not None:
             body["temperature"] = self.cfg.temperature
 
-        resp = _post_json(url, headers, body, self.cfg.timeout)
+        resp = _post_json(url, headers, body)
 
         choices = resp.get("choices", [])
         if not choices:
@@ -141,7 +167,7 @@ def gemini_list_models(api_key: str) -> list[str]:
     )
     req = urllib.request.Request(url, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req) as resp:
             data = json.loads(resp.read().decode())
     except urllib.error.HTTPError as exc:
         error_body = ""
@@ -186,7 +212,7 @@ class GeminiBackend:
                 "thinkingLevel": self.cfg.reasoning_effort,
             }
 
-        resp = _post_json(url, headers, body, self.cfg.timeout)
+        resp = _post_json(url, headers, body)
 
         candidates = resp.get("candidates", [])
         if not candidates:
