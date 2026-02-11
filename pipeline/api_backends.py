@@ -15,12 +15,18 @@ are no third-party dependencies.
 
 from __future__ import annotations
 
+import http.client
 import json
+import sys
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
 from .agent_config import AgentModelConfig, _PROVIDER_DEFAULTS
+
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 2.0  # seconds; doubles each attempt
 
 
 # ---------------------------------------------------------------------------
@@ -32,23 +38,44 @@ def _post_json(
     headers: dict[str, str],
     body: dict,
 ) -> dict:
-    """Send a JSON POST request and return the parsed response."""
+    """Send a JSON POST request and return the parsed response.
+
+    Retries up to ``_MAX_RETRIES`` times on transient connection errors
+    (``RemoteDisconnected``, ``ConnectionResetError``, etc.) with exponential
+    backoff.
+    """
     data = json.dumps(body).encode()
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read().decode())
-    except urllib.error.HTTPError as exc:
-        error_body = ""
+    last_exc: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
         try:
-            error_body = exc.read().decode()[:2000]
-        except Exception:
-            pass
-        raise RuntimeError(
-            f"API request failed ({exc.code}): {error_body}"
-        ) from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Network error: {exc.reason}") from exc
+            with urllib.request.urlopen(req) as resp:
+                return json.loads(resp.read().decode())
+        except urllib.error.HTTPError as exc:
+            error_body = ""
+            try:
+                error_body = exc.read().decode()[:2000]
+            except Exception:
+                pass
+            raise RuntimeError(
+                f"API request failed ({exc.code}): {error_body}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            # URLError wraps socket-level errors; retry on transient ones
+            if isinstance(exc.reason, (ConnectionResetError, http.client.RemoteDisconnected)):
+                last_exc = exc
+            else:
+                raise RuntimeError(f"Network error: {exc.reason}") from exc
+        except (ConnectionError, http.client.RemoteDisconnected, OSError) as exc:
+            last_exc = exc
+        delay = _RETRY_BASE_DELAY * (2 ** attempt)
+        print(
+            f"  [retry] transient network error (attempt {attempt + 1}/{_MAX_RETRIES}): "
+            f"{last_exc!r} — retrying in {delay:.0f}s",
+            file=sys.stderr, flush=True,
+        )
+        time.sleep(delay)
+    raise RuntimeError(f"Network error after {_MAX_RETRIES} retries: {last_exc}") from last_exc
 
 
 # ---------------------------------------------------------------------------
