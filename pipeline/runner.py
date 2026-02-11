@@ -4,8 +4,10 @@ import argparse
 import os
 import re
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import TextIO
 
 from .agent_config import find_config_file, load_config_file, validate_approved_backends
 from .agents import render_prompt
@@ -137,9 +139,19 @@ def _build_json_fix_prompt(original_output: str, error_message: str) -> str:
     )
 
 
+_pipeline_t0: float = 0.0
+_pipeline_log: TextIO | None = None
+
+
 def _status(msg: str) -> None:
-    """Print a pipeline progress line to stderr."""
-    print(f"  {msg}", file=sys.stderr, flush=True)
+    """Print a pipeline progress line to stderr with elapsed time."""
+    elapsed = time.monotonic() - _pipeline_t0 if _pipeline_t0 else 0.0
+    m, s = divmod(int(elapsed), 60)
+    tag = f"[+{m:02d}:{s:02d}]"
+    line = f"  {tag} {msg}"
+    print(line, file=sys.stderr, flush=True)
+    if _pipeline_log is not None:
+        print(line, file=_pipeline_log, flush=True)
 
 
 def _log_shuffle(assignments: dict[str, str], phase: str) -> None:
@@ -155,10 +167,19 @@ def run_pipeline(
     config: PipelineConfig,
     backend: BackendRouter,
 ) -> PipelineRunResult:
+    global _pipeline_t0, _pipeline_log
+    _pipeline_t0 = time.monotonic()
+
     config.validate()
     problem_inputs = load_problem_inputs(problem_dir)
     started_dt = utc_now()
     started_at = started_dt.isoformat()
+
+    # Open a run log file alongside the other artifacts
+    timestamp = format_timestamp(started_dt)
+    out_dir = ensure_output_dir(problem_dir, config.out_dir_name)
+    log_path = out_dir / f"{timestamp}-log.txt"
+    _pipeline_log = open(log_path, "w", encoding="utf-8")  # noqa: SIM115
 
     loops: list[LoopRecord] = []
     prior_transcript = ""
@@ -368,8 +389,10 @@ def run_pipeline(
 
     finished_dt = utc_now()
     finished_at = finished_dt.isoformat()
-    timestamp = format_timestamp(started_dt)
-    out_dir = ensure_output_dir(problem_dir, config.out_dir_name)
+    _status(f"pipeline finished — {finished_at}")
+    if _pipeline_log is not None:
+        _pipeline_log.close()
+        _pipeline_log = None
     transcript_path = out_dir / f"{timestamp}-transcript.md"
     meta_path = out_dir / f"{timestamp}-meta.json"
     latex_path = out_dir / f"{timestamp}-report.tex"
