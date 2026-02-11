@@ -27,6 +27,7 @@ from .agent_config import AgentModelConfig, _PROVIDER_DEFAULTS
 
 _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 2.0  # seconds; doubles each attempt
+_DEFAULT_TIMEOUT = 120  # seconds per HTTP request
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +50,7 @@ def _post_json(
     for attempt in range(_MAX_RETRIES):
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req) as resp:
+            with urllib.request.urlopen(req, timeout=_DEFAULT_TIMEOUT) as resp:
                 return json.loads(resp.read().decode())
         except urllib.error.HTTPError as exc:
             error_body = ""
@@ -67,7 +68,8 @@ def _post_json(
                 ) from exc
         except urllib.error.URLError as exc:
             # URLError wraps socket-level errors; retry on transient ones
-            if isinstance(exc.reason, (ConnectionResetError, http.client.RemoteDisconnected)):
+            if isinstance(exc.reason, (ConnectionResetError, http.client.RemoteDisconnected,
+                                       TimeoutError, OSError)):
                 last_exc = exc
             else:
                 raise RuntimeError(f"Network error: {exc.reason}") from exc
