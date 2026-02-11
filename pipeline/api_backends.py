@@ -24,6 +24,7 @@ import urllib.request
 from dataclasses import dataclass
 
 from .agent_config import AgentModelConfig, _PROVIDER_DEFAULTS
+from .cost import tracker as _cost_tracker
 
 _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 2.0  # seconds; doubles each attempt
@@ -112,6 +113,13 @@ class AnthropicBackend:
 
         resp = _post_json(url, headers, body)
 
+        usage = resp.get("usage", {})
+        _cost_tracker.record(
+            self.cfg.provider, self.cfg.model,
+            usage.get("input_tokens", 0),
+            usage.get("output_tokens", 0),
+        )
+
         content_blocks = resp.get("content", [])
         texts = [b["text"] for b in content_blocks if b.get("type") == "text"]
         if not texts:
@@ -148,6 +156,13 @@ class OpenAIBackend:
             body["temperature"] = self.cfg.temperature
 
         resp = _post_json(url, headers, body)
+
+        usage = resp.get("usage", {})
+        _cost_tracker.record(
+            self.cfg.provider, self.cfg.model,
+            usage.get("prompt_tokens", 0),
+            usage.get("completion_tokens", 0),
+        )
 
         choices = resp.get("choices", [])
         if not choices:
@@ -220,6 +235,13 @@ class GeminiBackend:
             }
 
         resp = _post_json(url, headers, body)
+
+        usage = resp.get("usageMetadata", {})
+        _cost_tracker.record(
+            self.cfg.provider, self.cfg.model,
+            usage.get("promptTokenCount", 0),
+            usage.get("candidatesTokenCount", 0),
+        )
 
         candidates = resp.get("candidates", [])
         if not candidates:
