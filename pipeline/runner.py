@@ -139,6 +139,20 @@ def _build_json_fix_prompt(original_output: str, error_message: str) -> str:
     )
 
 
+def _build_section_fix_prompt(original_output: str, error_message: str) -> str:
+    """Construct a reprompt asking the LLM to add missing sections."""
+    return (
+        "Your previous response was missing required section headings.\n\n"
+        f"Error: {error_message}\n\n"
+        "Here is your original output:\n"
+        "---\n"
+        f"{original_output}\n"
+        "---\n\n"
+        "Please return the complete output with all required headings present. "
+        "Keep the same content but ensure every required heading appears."
+    )
+
+
 _pipeline_t0: float = 0.0
 _pipeline_log: TextIO | None = None
 
@@ -218,7 +232,13 @@ def run_pipeline(
         _status(f"[loop {loop_index}/{config.max_loops}] researcher ...")
         researcher_prompt = render_prompt("researcher", base_context)
         researcher_text = backend.generate("researcher", researcher_prompt, base_context)
-        ensure_required_sections("researcher", researcher_text)
+        try:
+            ensure_required_sections("researcher", researcher_text)
+        except OutputValidationError as exc:
+            _status(f"[retry] researcher sections: {exc}")
+            fix_prompt = _build_section_fix_prompt(researcher_text, str(exc))
+            researcher_text = backend.generate("researcher", fix_prompt, base_context)
+            ensure_required_sections("researcher", researcher_text)
         base_context["researcher_output"] = researcher_text
 
         # --- Mentor (runs if first loop or wrong_track) ---
@@ -226,7 +246,13 @@ def run_pipeline(
             _status(f"[loop {loop_index}/{config.max_loops}] mentor ...")
             mentor_prompt = render_prompt("mentor", base_context)
             mentor_text = backend.generate("mentor", mentor_prompt, base_context)
-            ensure_required_sections("mentor", mentor_text)
+            try:
+                ensure_required_sections("mentor", mentor_text)
+            except OutputValidationError as exc:
+                _status(f"[retry] mentor sections: {exc}")
+                fix_prompt = _build_section_fix_prompt(mentor_text, str(exc))
+                mentor_text = backend.generate("mentor", fix_prompt, base_context)
+                ensure_required_sections("mentor", mentor_text)
         else:
             _status(f"[loop {loop_index}/{config.max_loops}] mentor (reused — right_track)")
             # Reuse last mentor output when feedback_target is prover (right_track)
@@ -238,7 +264,13 @@ def run_pipeline(
         prover_context["mentor_output"] = mentor_text
         prover_prompt = render_prompt("prover", prover_context)
         prover_text = backend.generate("prover", prover_prompt, prover_context)
-        ensure_required_sections("prover", prover_text)
+        try:
+            ensure_required_sections("prover", prover_text)
+        except OutputValidationError as exc:
+            _status(f"[retry] prover sections: {exc}")
+            fix_prompt = _build_section_fix_prompt(prover_text, str(exc))
+            prover_text = backend.generate("prover", fix_prompt, prover_context)
+            ensure_required_sections("prover", prover_text)
 
         # --- Editor dispatch ---
         _status(f"[loop {loop_index}/{config.max_loops}] editor dispatch ...")
