@@ -281,6 +281,7 @@ class CodexCLIBackend:
     model: str | None = None
     codex_bin: str = "codex"
     workdir: Path | None = None
+    sandbox: str = "workspace-write"
     full_auto: bool = True
     skip_git_repo_check: bool = True
     color: str = "never"
@@ -305,6 +306,8 @@ class CodexCLIBackend:
             cmd.extend(["--cd", str(self.workdir)])
         if self.full_auto:
             cmd.append("--full-auto")
+        if self.sandbox:
+            cmd.extend(["--sandbox", self.sandbox])
         if self.color:
             cmd.extend(["--color", self.color])
         cmd.extend(["--output-last-message", str(output_path)])

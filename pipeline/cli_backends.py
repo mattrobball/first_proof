@@ -13,7 +13,6 @@ Supported CLI tools:
 
 from __future__ import annotations
 
-import json
 import re
 import shutil
 import subprocess
@@ -34,6 +33,7 @@ class CodexCLIBackend:
 
     cfg: AgentModelConfig
     workdir: Path | None = None
+    sandbox: str = "workspace-write"
     full_auto: bool = True
     skip_git_repo_check: bool = True
     color: str = "never"
@@ -60,6 +60,8 @@ class CodexCLIBackend:
             cmd.extend(["--cd", str(self.workdir)])
         if self.full_auto:
             cmd.append("--full-auto")
+        if self.sandbox:
+            cmd.extend(["--sandbox", self.sandbox])
         if self.color:
             cmd.extend(["--color", self.color])
         cmd.extend(["--output-last-message", str(output_path)])
@@ -150,11 +152,10 @@ class CodexCLIBackend:
 
 @dataclass
 class ClaudeCLIBackend:
-    """Runs one agentic ``claude --print`` invocation per agent turn."""
+    """Runs one ``claude -p`` invocation per agent turn."""
 
     cfg: AgentModelConfig
     workdir: Path | None = None
-    max_turns: int = 25
 
     def __post_init__(self) -> None:
         binary = self.cfg.resolved_cli_command()
@@ -166,14 +167,7 @@ class ClaudeCLIBackend:
         self._resolved_bin = resolved
 
     def _command(self) -> list[str]:
-        cmd = [
-            self._resolved_bin, "--print",
-            "--output-format", "json",
-            "--dangerously-skip-permissions",
-            "--max-turns", str(self.max_turns),
-            "--tools", "Read,Glob,Grep,WebSearch,WebFetch",
-            "--no-session-persistence",
-        ]
+        cmd = [self._resolved_bin, "--print", "--output-format", "text"]
         if self.cfg.model:
             cmd.extend(["--model", self.cfg.model])
         if self.cfg.reasoning_effort:
@@ -200,34 +194,18 @@ class ClaudeCLIBackend:
             cwd=cwd,
         )
 
-        stdout = proc.stdout.strip()
-
-        # Try to parse structured JSON output
-        try:
-            data = json.loads(stdout)
-            subtype = data.get("subtype", "")
-            if subtype.startswith("error_"):
-                raise RuntimeError(
-                    f"Claude CLI agent error for role '{role}': "
-                    f"{subtype} — {data.get('result', '')}"
-                )
-            result = data.get("result", "").strip()
-            if result:
-                return result
-        except (json.JSONDecodeError, AttributeError):
-            # Fall back to raw stdout if JSON parsing fails
-            if proc.returncode == 0 and stdout:
-                return stdout
-
-        if proc.returncode != 0:
-            stderr_snippet = self._trim(proc.stderr)
+        if proc.returncode == 0:
+            text = proc.stdout.strip()
+            if text:
+                return text
             raise RuntimeError(
-                f"Claude CLI failed for role '{role}' with exit code "
-                f"{proc.returncode}. stderr: {stderr_snippet!r}"
+                f"Claude CLI returned empty output for role '{role}'"
             )
 
+        stderr_snippet = self._trim(proc.stderr)
         raise RuntimeError(
-            f"Claude CLI returned empty output for role '{role}'"
+            f"Claude CLI failed for role '{role}' with exit code "
+            f"{proc.returncode}. stderr: {stderr_snippet!r}"
         )
 
 
