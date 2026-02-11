@@ -123,6 +123,20 @@ def _aggregate_issue_counts(loops: list[LoopRecord]) -> dict[str, int]:
     return counts
 
 
+def _build_json_fix_prompt(original_output: str, error_message: str) -> str:
+    """Construct a reprompt asking the LLM to return corrected JSON."""
+    return (
+        "Your previous response contained a JSON block that failed validation.\n\n"
+        f"Error: {error_message}\n\n"
+        "Here is your original output:\n"
+        "---\n"
+        f"{original_output}\n"
+        "---\n\n"
+        "Please return the corrected JSON inside a fenced ```json block. "
+        "Keep the same structure and content but fix the error."
+    )
+
+
 def _status(msg: str) -> None:
     """Print a pipeline progress line to stderr."""
     print(f"  {msg}", file=sys.stderr, flush=True)
@@ -215,9 +229,19 @@ def run_pipeline(
         dispatch_text = backend.generate(
             "editor_dispatch", dispatch_prompt, dispatch_context
         )
-        editor_dispatch = parse_editor_dispatch_output(
-            dispatch_text, perspective_names, pool_names
-        )
+        try:
+            editor_dispatch = parse_editor_dispatch_output(
+                dispatch_text, perspective_names, pool_names
+            )
+        except OutputValidationError as exc:
+            _status(f"[retry] editor dispatch: {exc}")
+            fix_prompt = _build_json_fix_prompt(dispatch_text, str(exc))
+            dispatch_text = backend.generate(
+                "editor_dispatch", fix_prompt, dispatch_context
+            )
+            editor_dispatch = parse_editor_dispatch_output(
+                dispatch_text, perspective_names, pool_names
+            )
 
         # --- Reviewers (one per perspective, parallel) ---
         num_perspectives = len(config.reviewer_perspectives)
@@ -239,11 +263,23 @@ def run_pipeline(
             reviewer_text = backend.generate_with_pool(
                 assigned_pool, "reviewer", reviewer_prompt, reviewer_context
             )
-            reviewer_result = parse_reviewer_output(
-                reviewer_text,
-                reviewer_name=assigned_pool,
-                perspective_name=persp_name,
-            )
+            try:
+                reviewer_result = parse_reviewer_output(
+                    reviewer_text,
+                    reviewer_name=assigned_pool,
+                    perspective_name=persp_name,
+                )
+            except OutputValidationError as exc:
+                _status(f"[retry] reviewer {persp_name}: {exc}")
+                fix_prompt = _build_json_fix_prompt(reviewer_text, str(exc))
+                reviewer_text = backend.generate_with_pool(
+                    assigned_pool, "reviewer", fix_prompt, reviewer_context
+                )
+                reviewer_result = parse_reviewer_output(
+                    reviewer_text,
+                    reviewer_name=assigned_pool,
+                    perspective_name=persp_name,
+                )
             return persp_name, reviewer_text, reviewer_result
 
         with ThreadPoolExecutor(max_workers=num_perspectives) as executor:
@@ -273,7 +309,15 @@ def run_pipeline(
         decision_text = backend.generate(
             "editor_decision", decision_prompt, decision_context
         )
-        verdict, summary, feedback = parse_editor_decision_output(decision_text)
+        try:
+            verdict, summary, feedback = parse_editor_decision_output(decision_text)
+        except OutputValidationError as exc:
+            _status(f"[retry] editor decision: {exc}")
+            fix_prompt = _build_json_fix_prompt(decision_text, str(exc))
+            decision_text = backend.generate(
+                "editor_decision", fix_prompt, decision_context
+            )
+            verdict, summary, feedback = parse_editor_decision_output(decision_text)
 
         # --- Editor summary (shown to user) ---
         issue_summary = ", ".join(

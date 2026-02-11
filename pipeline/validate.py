@@ -52,7 +52,7 @@ def ensure_required_sections(role: str, text: str) -> None:
 
 def _extract_json_block(text: str, label: str) -> dict:
     """Extract and parse a fenced JSON block from *text*."""
-    match = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
+    match = re.search(r"```json\s*(\{.*\})\s*```", text, re.DOTALL)
     if not match:
         raise OutputValidationError(f"{label} output missing fenced JSON payload")
     try:
