@@ -85,7 +85,7 @@ Config discovery order: `--config` flag → `pipeline.toml` in problem dir → `
 
 ### Problem Folder Contract
 
-Each problem lives in a numbered directory (e.g., `5/`) containing `QUESTION.md` and `BACKGROUND.md`. Run artifacts go to `<problem>/runs/`.
+Each problem lives under `runs/<N>/` (e.g., `runs/5/`) containing `QUESTION.md` and `BACKGROUND.md`. Pipeline outputs (transcripts, LaTeX, metadata, checkpoints) are written directly into the same directory. The `runs/` tree is gitignored on `main`.
 
 ## Key Conventions
 

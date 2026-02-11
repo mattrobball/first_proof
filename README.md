@@ -7,7 +7,7 @@ editor synthesizes their feedback into a revision decision.
 
 ## Pipeline Flow
 
-0. **Researcher** (once, pre-loop) — gathers relevant theorems and strategies
+0. **Researcher** — gathers relevant theorems and strategies (runs every loop)
 1. **Mentor** — formalizes the problem and proposes proof strategy
 2. **Prover** — writes the complete proof
 3. **Editor Dispatch** — assigns pool reviewers to perspectives
@@ -19,17 +19,18 @@ The loop repeats until the editor accepts or the loop budget is exhausted.
 
 ## Problem Folders
 
-Problem folders are created automatically at pipeline start. When you run
-`--problem 5`, the pipeline will:
+Problem folders live under `runs/<N>/`. When you run `--problem 5`, the
+pipeline will:
 
-1. Create the `5/` directory if it doesn't exist
-2. Extract **Question 5** from `first_proof.md` into `5/QUESTION.md`
-3. Create a stub `5/BACKGROUND.md` if missing
+1. Create `runs/5/` if it doesn't exist
+2. Extract **Question 5** from `first_proof.md` into `runs/5/QUESTION.md`
+3. Create a stub `runs/5/BACKGROUND.md` if missing
 
 You can also create these files manually. Existing files are never overwritten.
 
-Run artifacts are written to `N/runs/` (gitignored on `main`; archived on the
-`live_runs` branch).
+Inputs (`QUESTION.md`, `BACKGROUND.md`) and outputs (transcripts, LaTeX
+reports, metadata) live side by side in the same directory. The `runs/`
+tree is gitignored on `main` and archived on the `live_runs` branch.
 
 ## Quickstart
 
@@ -54,7 +55,7 @@ python -m pipeline.runner --problem 5 --backend demo
 
 This runs the full pipeline with a deterministic stub backend — researcher,
 mentor, prover, reviewers, and editor — and writes a transcript, LaTeX report,
-and metadata file to `5/runs/`.
+and metadata file to `runs/5/`.
 
 ## Other usage
 
@@ -132,8 +133,8 @@ credentials there instead of exporting them in your shell.
 - **`main`** — production pipeline code (run artifacts are gitignored)
 - **`digital_twin`** — a more realistic model of the academic peer review
   process 😉
-- **`live_runs`** — archived transcripts, LaTeX reports, and metadata from
-  past pipeline runs
+- **`live_runs`** — development branch; also archives transcripts, LaTeX
+  reports, and metadata from past pipeline runs
 
 ## Testing
 
