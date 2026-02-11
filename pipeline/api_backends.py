@@ -40,9 +40,9 @@ def _post_json(
 ) -> dict:
     """Send a JSON POST request and return the parsed response.
 
-    Retries up to ``_MAX_RETRIES`` times on transient connection errors
-    (``RemoteDisconnected``, ``ConnectionResetError``, etc.) with exponential
-    backoff.
+    Retries up to ``_MAX_RETRIES`` times on transient errors (HTTP 5xx,
+    429 rate-limit, ``RemoteDisconnected``, ``ConnectionResetError``, etc.)
+    with exponential backoff.
     """
     data = json.dumps(body).encode()
     last_exc: Exception | None = None
@@ -57,9 +57,14 @@ def _post_json(
                 error_body = exc.read().decode()[:2000]
             except Exception:
                 pass
-            raise RuntimeError(
-                f"API request failed ({exc.code}): {error_body}"
-            ) from exc
+            if exc.code >= 500 or exc.code == 429:
+                last_exc = RuntimeError(
+                    f"API request failed ({exc.code}): {error_body}"
+                )
+            else:
+                raise RuntimeError(
+                    f"API request failed ({exc.code}): {error_body}"
+                ) from exc
         except urllib.error.URLError as exc:
             # URLError wraps socket-level errors; retry on transient ones
             if isinstance(exc.reason, (ConnectionResetError, http.client.RemoteDisconnected)):
@@ -70,12 +75,12 @@ def _post_json(
             last_exc = exc
         delay = _RETRY_BASE_DELAY * (2 ** attempt)
         print(
-            f"  [retry] transient network error (attempt {attempt + 1}/{_MAX_RETRIES}): "
+            f"  [retry] transient error (attempt {attempt + 1}/{_MAX_RETRIES}): "
             f"{last_exc!r} — retrying in {delay:.0f}s",
             file=sys.stderr, flush=True,
         )
         time.sleep(delay)
-    raise RuntimeError(f"Network error after {_MAX_RETRIES} retries: {last_exc}") from last_exc
+    raise RuntimeError(f"Request failed after {_MAX_RETRIES} retries: {last_exc}") from last_exc
 
 
 # ---------------------------------------------------------------------------
