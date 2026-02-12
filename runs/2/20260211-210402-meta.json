@@ -1,0 +1,665 @@
+{
+  "executed_loops": 5,
+  "final_verdict": "wrong_track",
+  "finished_at": "2026-02-11T22:26:33.913674+00:00",
+  "input_hashes": {
+    "background_sha256": "2cc993fe983f0289c641a0b6411d6221d46eafb74b1a2ac58895e053568c1747",
+    "question_sha256": "37c0e8903a371e61d98b08e657c381dce07a26dc3691629af3d97daeab7d2f62"
+  },
+  "issue_counts": {
+    "critical": 11,
+    "major": 27,
+    "minor": 26
+  },
+  "latex_path": "/home/matt.linux/misc/first_proof/runs/2/20260211-210402-report.tex",
+  "loops": [
+    {
+      "editor_decision": {
+        "feedback": "The proof requires significant revision of Lemma 4 and the main logical structure regarding the choice of W.\n\n1. **Lemma 4 (Analytic Correction):** The reduction to a one-variable Mellin transform is incorrect for n \u2265 2. You must analyze the integral over N_n \\ G_n using the Iwasawa decomposition and the multivariable Kirillov model structure (see Reviewer 1).\n\n2. **Lemma 4 (Algebraic Correction):** The claim that for *any* fixed W, the integrals generate the full ring C[q^s, q^{-s}] is not established. The 'linear combinations of shell indicators' argument fails because W may vanish on specific shells. You must either:\n   (a) Prove rigorously that the image of \u039b_W is an ideal containing a unit (derived from local non-vanishing of W), or\n   (b) Weaken the claim to 'There exists a W...' and use a specific test vector (e.g., the newform) or vary both W and V as in standard JPSS theory (see Reviewers 2, 6, 12).\n\n3. **Rigor & Citations:** Explicitly cite the JPSS theorems used for convergence, meromorphic continuation, and the polynomial nature of L(s)^{-1}. Clarify the definition of G_n and the action \u03c1(h).",
+        "feedback_target": "prover",
+        "reviewer_results": [
+          {
+            "issues": [
+              {
+                "location": "Lemma 4 proof",
+                "reason": "The identification of normalized zeta integrals with one-dimensional Mellin transforms over F^\u00d7 is incorrect for n \u2265 2. The JPSS unfolded integral for GL_{n+1} \u00d7 GL_n lives on N_n \\ GL_n, which is (n-1)-dimensional over the torus. The reduction to a single-variable Mellin transform is not justified and is false in general.",
+                "required_fix": "Replace the one-dimensional Mellin transform argument with the correct multi-variable version. The integral over N_n \\ GL_n, via Iwasawa decomposition g = u\u00b7diag(a_1,...,a_n)\u00b7k, becomes a multi-variable integral over (F^\u00d7)^n (after integrating over compact and unipotent parts). The Kirillov model of \u03c0 provides functions on F^{n-1} \\ {0} (Bernstein\u2013Zelevinsky), and the surjectivity argument must use this multi-variable structure.",
+                "severity": "major",
+                "suggestion": "State the argument as follows: via Iwasawa decomposition on GL_n, the integral reduces to a sum/integral over the torus A_n \u2245 (F^\u00d7)^n. The Kirillov model of \u03c0, restricted to A_n via BZ theory, contains all of C_c^\u221e(F^{n-1} \\ {0}) (extended by the central character on the last coordinate). For fixed nonzero W, the restriction W|_{diag(a_1,...,a_n,1)} is a nonzero locally constant function. The pairing between W|_{A_n} and the Kirillov functions of \u03c0 then surjects onto all Laurent polynomials in q^{-s} by the density of C_c^\u221e in the appropriate L^2 space. Alternatively, cite Jacquet (2009, \u00a75) or Cogdell\u2013Piatetski-Shapiro (Lecture 3, Proposition 3.1) for the precise fixed-W surjectivity statement."
+              },
+              {
+                "location": "Lemma 4 proof",
+                "reason": "The surjectivity claim \u2014 that for any nonzero W, the image of V \u21a6 \u03a8(s;W,V)/L is the full Laurent polynomial ring \u2014 is not a direct corollary of JPSS + BZ Kirillov theory as presented. The proof's final paragraph ('Finite linear combinations of shell indicators therefore produce every Laurent polynomial') works for GL_2 \u00d7 GL_1 but does not generalize without further argument. The step from 'the Kirillov model contains C_c^\u221e(F^\u00d7)' to 'the image of \u039b_W is all Laurent polynomials' hides the dependence on W.",
+                "required_fix": "The proof must explain why the restriction of W to the embedded GL_n (or mirabolic) is 'sufficiently generic' to pair nontrivially with all Kirillov functions. Specifically: W restricted to diag(GL_n, 1) is a Whittaker function for \u03a0|_{P_{n+1}}, and by BZ theory for \u03a0, this restriction is nonzero on an open subset of the torus. The integral then becomes a convolution/pairing that surjects because one factor (from \u03c0's Kirillov model) ranges over all compactly supported functions.",
+                "severity": "major",
+                "suggestion": "Add a sub-argument: (i) By BZ theory for \u03a0, the restriction of W to the mirabolic P_n \u21aa GL_{n+1} is nonzero, hence nonzero on some open compact subset of the torus. (ii) The Kirillov functions from \u03c0's Whittaker model include all of C_c^\u221e(F^{n-1} \\ {0}). (iii) The pairing of a fixed nonzero locally constant function (from W) against all compactly supported functions (from \u03c0) surjects onto C_c^\u221e, and the Mellin image of C_c^\u221e is the full ring of Laurent polynomials. This three-step sub-argument closes the gap."
+              },
+              {
+                "location": "Lemma 2 proof",
+                "reason": "The proof says '\u03c1(h) is an automorphism of the Whittaker model with inverse \u03c1(h^{-1})'. While correct, this implicitly uses that \u03c1(h) maps W(\u03a0,\u03c8^{-1}) to itself \u2014 which is true because \u03c1(h) is the representation action of \u03a0, but this should be stated. As written, one might confuse \u03c1(h) (right translation on functions on GL_{n+1}) with the representation action.",
+                "required_fix": "Clarify that \u03c1(h)W(g) := W(gh) defines the action of \u03a0 on its Whittaker realization, and this action preserves W(\u03a0,\u03c8^{-1}) by definition of the Whittaker model as a \u03a0-submodule of Ind(\u03c8^{-1}).",
+                "severity": "minor",
+                "suggestion": "Add one sentence: 'Since W(\u03a0,\u03c8^{-1}) is a GL_{n+1}(F)-module under right translation (this being the Whittaker realization of \u03a0), \u03c1(h) is an invertible endomorphism of W(\u03a0,\u03c8^{-1}), hence W \u2260 0 implies \u03c1(h)W \u2260 0.'"
+              },
+              {
+                "location": "Main proof, convergence",
+                "reason": "The proof does not explicitly state that \u03a8(s;W,V;u_Q) has meromorphic continuation rational in q^{-s}, nor that the initial integral converges for Re(s) \u226b 0. The conclusion 'the meromorphic continuation is a nonzero constant' presupposes both facts without citing them.",
+                "required_fix": "Add a sentence citing JPSS for: (a) absolute convergence in a right half-plane, (b) meromorphic continuation as a rational function in q^{-s}. Then the identity \u03a8 = 1 (as rational functions) implies the continuation is the constant 1, finite and nonzero everywhere.",
+                "severity": "minor",
+                "suggestion": "Before 'So the meromorphic continuation is a nonzero constant', insert: 'By [JPSS, Theorem 2.7], the integral \u03a8(s;W,V;u_Q) converges absolutely for Re(s) sufficiently large and admits meromorphic continuation to a rational function in q^{-s}. Since this rational function equals the constant 1 in the region of convergence, it equals 1 identically.'"
+              },
+              {
+                "location": "Lemma 4 proof, module structure",
+                "reason": "The proof claims the image of \u039b_W is an ideal in C[q^s, q^{-s}] without justification. Linearity in V gives closure under addition. Closure under multiplication by q^{-ms} requires that if V \u2208 W(\u03c0,\u03c8), then |det|^m \u00b7 V is also in W(\u03c0,\u03c8) \u2014 but |det|^m \u00b7 V lies in W(\u03c0 \u2297 |det|^m, \u03c8), not W(\u03c0,\u03c8). The ideal structure needs a different justification.",
+                "required_fix": "The image is an ideal because the 'test function' V can be modified by multiplying by Schwartz functions on F^\u00d7 (via the Kirillov model), which has the effect of multiplying the Mellin transform by arbitrary Laurent polynomials. Alternatively, one can directly use the fact that the Kirillov model contains C_c^\u221e(F^{n-1} \\ {0}) to produce arbitrary polynomial multiples. This should be stated explicitly.",
+                "severity": "minor",
+                "suggestion": "Replace the ideal-structure claim with: 'The image of \u039b_W is a C[q^s, q^{-s}]-submodule (hence ideal) because for any Laurent monomial q^{-ms} and any V, one can find V' \u2208 W(\u03c0,\u03c8) with \u039b_W(V') = q^{-ms} \u00b7 \u039b_W(V): in the Kirillov model, replace the test function \u03c6_V(a) by \u03c6_V(a) \u00b7 1_{\u03d6^m \u00b7 supp}(a) (shifted support), which achieves the monomial twist while remaining in W(\u03c0,\u03c8).' Or more cleanly, argue surjectivity directly without needing the ideal structure, since the Kirillov model already gives full control."
+              }
+            ],
+            "perspective_name": "Correctness & Completeness",
+            "residual_concerns": [
+              "The proof proves the stronger claim 'any nonzero W works' but the problem only asks for existence of some W. While the stronger result is correct, the reviewer notes that the key input (Lemma 4) is a deep result that arguably deserves either a self-contained proof or a precise literature citation with theorem number. The current justification is at the level of a research-level sketch rather than a complete proof.",
+              "The argument tacitly assumes n \u2265 1 throughout (so that GL_n is nontrivial and the Rankin\u2013Selberg integral is well-defined). This is stated in A3 but should be recalled at the point of use.",
+              "No explicit Haar measure compatibility check is given between the measure on N_n \\ GL_n used in the integral and the measure implicit in the Kirillov model pairing. For a fully rigorous proof at graduate level, this should be addressed (even if the conclusion is that the measures differ by a nonzero constant that can be absorbed)."
+            ],
+            "reviewer_name": "claude_code"
+          },
+          {
+            "issues": [
+              {
+                "location": "Lemma 4 and final claim \"Thus one may take any nonzero W\"",
+                "reason": "The proof uses a statement stronger than standard JPSS ideal generation: from the joint ideal over all (W,V), it concludes surjectivity for each fixed nonzero W. That implication is not established and is generally nontrivial.",
+                "required_fix": "Either prove (with a precise cited theorem) that for each fixed nonzero W the normalized image in C[q^s,q^{-s}] is all of C[q^s,q^{-s}], or replace the argument by constructing a specific test vector W and proving the required constant integral for that vector.",
+                "severity": "critical",
+                "suggestion": "Use a known test-vector theorem (e.g., essential/newform-based constructions) to prove existence of one suitable W, instead of claiming every nonzero W works."
+              },
+              {
+                "location": "Lemma 4 formula: \u039b_W(V)=\u222b_{F^\u00d7} \u03c6_V(a)|a|^s d^\u00d7a",
+                "reason": "This one-variable Mellin formula is not the general GL_{n+1}\u00d7GL_n Rankin\u2013Selberg unfolded expression for n>1 and suppresses dependence on W. It is not a valid rigorous reduction in the stated generality.",
+                "required_fix": "Replace with the correct unfolded integral for general n (torus/Iwasawa variables and Whittaker restrictions), and show precisely how varying V generates the needed Laurent polynomials.",
+                "severity": "critical",
+                "suggestion": "State an explicit proposition for general n with full variables and then deduce polynomial spanning from that proposition."
+              },
+              {
+                "location": "Lemma 4: \"V\u21a6\u03c6_V is onto a space containing C_c^\u221e(F^\u00d7)\"",
+                "reason": "Key objects are undefined (what is the target space? how does it depend on W?) and the surjectivity claim is stated without hypotheses or precise theorem.",
+                "required_fix": "Define the map and codomain explicitly, including dependence on W, and provide a complete argument or exact citation for surjectivity.",
+                "severity": "major",
+                "suggestion": "Introduce T_W: W(\u03c0,\u03c8)\u2192C[q^s,q^{-s}], T_W(V)=\u03a8(s;W,V)/L(s,\u03a0\u00d7\u03c0), then prove/cite Im(T_W)=C[q^s,q^{-s}] with theorem number."
+              },
+              {
+                "location": "Lemma 4 / Gap Closure Note 1",
+                "reason": "External inputs are cited only at a high level (\"JPSS unfolding\", \"Bernstein\u2013Zelevinsky Kirillov theory\") without theorem numbers or exact applicability checks.",
+                "required_fix": "Add precise references (theorem/proposition numbers, source, hypotheses) for each imported nontrivial fact used in the proof.",
+                "severity": "major",
+                "suggestion": "Create a short \"Imported Results\" subsection listing each cited theorem and one sentence on why its hypotheses match A1\u2013A6."
+              },
+              {
+                "location": "Complete Proof step choosing V with \u03a8/L = L^{-1}",
+                "reason": "This step is logically valid only if Lemma 4 is fully established; as written, the theorem is presented as complete though the key surjectivity is not proved.",
+                "required_fix": "Mark the theorem as conditional on Lemma 4 or supply a complete proof of Lemma 4; otherwise rework the main theorem proof via a different established route.",
+                "severity": "major",
+                "suggestion": "If fixed-W surjectivity remains unavailable, pivot to an explicit W (from essential vectors/averaging) and compute \u03a8(s;W,V;u_Q) directly."
+              },
+              {
+                "location": "Lemma 1 proof notation",
+                "reason": "G_n appears without local definition in the proof section, which slightly weakens notation consistency.",
+                "required_fix": "Define G_n=GL_n(F) at first use or use GL_n(F) consistently.",
+                "severity": "minor",
+                "suggestion": "Add one notation line before lemma proofs to keep symbols self-contained."
+              }
+            ],
+            "perspective_name": "Clarity & Rigor",
+            "residual_concerns": [
+              "Even if Lemma 4 is repaired, the stronger statement \"any nonzero W works\" may still be false without additional conditions on the restriction of W to the relevant embedded subgroup.",
+              "If the target value is exactly 1 (not just nonzero constant), measure normalization and normalizing constants should be tracked explicitly."
+            ],
+            "reviewer_name": "codex_cli"
+          },
+          {
+            "issues": [
+              {
+                "location": "Lemma 4 proof",
+                "reason": "The claim that 'finite linear combinations of shell indicators therefore produce every Laurent polynomial' suggests that one can generate each monomial $q^{-ms}$ independently. This would require the fixed Whittaker function $W$ (or its Kirillov projection) to be non-vanishing on every shell $\\varpi^m \\mathfrak{o}^\\times$, which is not guaranteed for an arbitrary $W$.",
+                "required_fix": "Adjust the argument to state that since $W \\neq 0$, there exists *some* $V$ (supported on a region where $W$ is non-vanishing) such that the integral is a nonzero constant. Since nonzero constants are units in $\\mathbb{C}[q^s, q^{-s}]$, the ideal generated by the integrals is the full ring.",
+                "severity": "minor",
+                "suggestion": "Replace the claim about generating every polynomial basis-wise with an argument based on ideal theory: the image is an ideal containing a unit (derived from local non-vanishing), hence it is the whole ring."
+              }
+            ],
+            "perspective_name": "Reference Validity",
+            "residual_concerns": [],
+            "reviewer_name": "gemini_api"
+          }
+        ],
+        "summary": "The proof correctly identifies the JPSS unfolding and Kirillov model as the tools to use but fails in the technical execution of Lemma 4 (incorrect dimension reduction) and relies on an unproven and likely too strong claim about fixed-vector surjectivity.",
+        "verdict": "right_track"
+      },
+      "loop_index": 1
+    },
+    {
+      "editor_decision": {
+        "feedback": "1. **Fix Whittaker Definitions:** Redefine $W$ and $V_m$. They cannot be characteristic functions $\\mathbf{1}_{N_n K_n}$ because they must satisfy $W(ng) = \\psi^{-1}(n)W(g)$. Define them as functions supported on $N_n K_n$ that equal $1$ on $K_n$ (and transform correctly on $N_n$), verifying that this is well-defined (i.e., $\\psi$ is trivial on $N_n \\cap K_n$).\n2. **Justify Existence:** Provide a precise citation (e.g., to Jacquet-Shalika or Bernstein-Zelevinsky derivatives) or argument justifying that the Kirillov model contains vectors with these specific restrictions.\n3. **Expand Integral Calculation:** Explicitly reduce the integral from $N_n \\backslash G_n$ to $K_n(m)$ (using $G_n = N_n K_n(0)$ and measure decomposition). Show explicitly that for $g \\in K_n(m)$, the term $g_{nn}$ ensures $\\psi(Q g_{nn})$ is constant, addressing the dependence on units.\n4. **Verify Shift:** Briefly confirm that for $u(g,Q)$, the entries $(i, n+1)$ for $i < n$ do not affect the character $\\psi$.",
+        "feedback_target": "prover",
+        "reviewer_results": [
+          {
+            "issues": [
+              {
+                "location": "Lemma 3 and Lemma 4 (Kirillov/mirabolic prescription)",
+                "reason": "The notation 'V_m(g) = 1_{N_n K_n(m)}(g) on N_n \\ G_n' is inconsistent with psi-equivariance of Whittaker functions. A Whittaker function V satisfying V(ug) = psi(u)V(g) cannot literally equal 1 on N_n K_n(m) and 0 elsewhere, since that would force psi to be trivial. The same issue affects W in Lemma 3.",
+                "required_fix": "Reformulate precisely: state that W (resp. V_m) is the unique element of c-ind_{N_n}^{G_n}(psi_{N_n}) supported on N_n K_n(0) (resp. N_n K_n(m)) with W(iota(k)) = 1 for k in K_n(0) (resp. V_m(k) = 1 for k in K_n(m)). Then rewrite the integral computation using this corrected formulation.",
+                "severity": "critical",
+                "suggestion": "Replace '1_{N_n K_n(m)}' with a precise description: 'the unique function in c-ind_{N_n}^{G_n}(psi_{N_n}) satisfying V_m(k) = 1 for all k in K_n(m) and V_m supported on N_n K_n(m)'. Verify that the integral computation still yields the same constant by checking that the psi-equivariance factors cancel between W and V_m in the integrand (they do, since W transforms by psi^{-1} and V by psi)."
+              },
+              {
+                "location": "Lemma 3 (choice of W via mirabolic restriction)",
+                "reason": "The Bernstein-Zelevinsky Kirillov model theorem gives surjectivity of the restriction to the mirabolic P_{n+1}, not directly to iota(G_n). The proof cites 'Cogdell-Piatetski-Shapiro' and 'Matringe Prop. 2.4' but does not explain how prescription on iota(G_n) follows from the standard mirabolic result. Since G_n embeds into P_{n+1} via iota, and P_{n+1} = G_n \u22c9 F^n (semidirect with the unipotent radical), prescribing the restriction to G_n alone may not suffice \u2014 one also needs to specify behavior on the unipotent radical of P_{n+1}.",
+                "required_fix": "Provide an explicit argument (or precise reference with statement) showing that one can prescribe W(iota(g)) as a compactly supported function in c-ind_{N_n}^{G_n}(psi^{-1}_{N_n}) via the BZ Kirillov model for Pi restricted to P_{n+1}.",
+                "severity": "major",
+                "suggestion": "The cleanest approach: use the BZ result that the Kirillov model of Pi (restriction to P_{n+1}) contains c-ind_{N_{n+1} cap P_{n+1}}^{P_{n+1}}(psi^{-1}_{N_{n+1}}). Then note that restricting further to iota(G_n) \u2282 P_{n+1} and choosing the function to be supported on iota(N_n K_n(0)) gives the desired W. Alternatively, cite Jacquet-Shalika's explicit construction of test vectors."
+              },
+              {
+                "location": "Lemma 2 (shift factor formula)",
+                "reason": "The proof claims that the only superdiagonal entry of u(g,Q) that matters is the (n,n+1)-entry, but does not verify that the other entries Qg_{in} (i < n) at positions (i, n+1) are above the superdiagonal and hence invisible to psi_{N_{n+1}}. For n >= 2 this is clear since (i, n+1) with i < n means the column index n+1 exceeds i+1 (the superdiagonal column for row i). But this one-line verification is missing.",
+                "required_fix": "Add explicit verification: for i < n, the entry Qg_{in} sits at position (i, n+1). The superdiagonal entry in row i is (i, i+1). Since i < n implies i+1 <= n < n+1, position (i, n+1) is strictly above the superdiagonal and does not appear in psi_{N_{n+1}}.",
+                "severity": "major",
+                "suggestion": "Insert after 'u(g,Q) in N_{n+1}': 'The matrix u(g,Q) = I_{n+1} + sum_{i=1}^{n} Qg_{in} E_{i,n+1} has nonzero off-diagonal entries only in column n+1. The generic character psi_{N_{n+1}} reads off superdiagonal entries (j, j+1) for j=1,...,n. For i < n, position (i, n+1) is not superdiagonal since n+1 > i+1. The only superdiagonal entry affected is (n, n+1) = Qg_{nn}.'"
+              },
+              {
+                "location": "Main computation (integral evaluation)",
+                "reason": "The integral is over N_n \\ G_n, but the computation jumps to 'support is N_n K_n(m)' and 'for g = nk with k in K_n(m), |det g| = 1' without using the Iwasawa decomposition or explaining how the integral over N_n \\ G_n reduces to an integral over K_n(m). The measure decomposition N_n \\ G_n with representatives via Iwasawa (or Cartan) should be spelled out, and the integral should be reduced step by step.",
+                "required_fix": "Show explicitly: via Iwasawa G_n = N_n A_n K_n(0), a fundamental domain for N_n \\ G_n can be taken as A_n K_n(0). The support condition (both W and V_m supported on N_n K_n(m) \u2282 N_n K_n(0)) forces the A_n integral to collapse to a = I_n (the identity torus element), leaving only integration over K_n(m) with |det| = 1.",
+                "severity": "major",
+                "suggestion": "Write: 'Using the Iwasawa decomposition G_n = N_n A_n K_n(0), the quotient measure on N_n \\ G_n decomposes as d*a dk where d*a is a Haar measure on A_n and dk is Haar on K_n(0). Both W(iota(\u00b7)) and V_m are supported on N_n K_n(m), which intersects A_n K_n(0) precisely in K_n(m) (since K_n(m) \u2282 K_n(0) and elements of A_n K_n(m) with a \u2260 I have |det| \u2260 1 only if a \u2260 I ... )'. Actually, the reduction needs more care: N_n K_n(m) \u2229 A_n K_n(0) may include non-identity torus elements. The support of W on iota(G_n) is N_n K_n(0), not just K_n(0), so the restriction to A_n \u00d7 K_n(0) gives support where a \u2208 A_n \u2229 N_n K_n(0). Since A_n \u2229 N_n = {I}, this means a \u2208 A_n \u2229 K_n(0) = {diag(u_1,...,u_n) : u_i \u2208 o^\u00d7} \u2014 not just a = I. This needs careful treatment."
+              },
+              {
+                "location": "Main computation (torus integral collapse)",
+                "reason": "The proof implicitly assumes the integral collapses to K_n(m) with |det g| = 1, but does not account for the torus part of the Iwasawa decomposition. For g = nak with a = diag(a_1,...,a_n) \u2208 A_n and a_i \u2208 o^\u00d7 (since support is N_n K_n(0)), the function g_{nn} = (nak)_{nn}. The entry g_{nn} depends on a and k, not just k_{nn}. Specifically, for the standard Iwasawa decomposition with A_n = {diag(varpi^{e_1},...,varpi^{e_n})}, the support condition N_n K_n(0) forces all e_i = 0, so a \u2208 A_n(o) = (o^\u00d7)^n embedded diagonally. Then g_{nn} = a_n k_{nn} where a_n \u2208 o^\u00d7 and k_{nn} \u2208 1 + p^m.",
+                "required_fix": "Account for the a_n factor: Qg_{nn} = Qa_n k_{nn} where a_n \u2208 o^\u00d7 and k_{nn} \u2208 1 + p^m. Then Q a_n k_{nn} = Qa_n + Qa_n(k_{nn} - 1). Since val(Q) = -c and val(a_n(k_{nn}-1)) >= m = c, we get Qa_n(k_{nn}-1) \u2208 o, so psi(Qg_{nn}) = psi(Qa_n). This is NOT independent of g \u2014 it depends on a_n \u2208 o^\u00d7. The integral does not simplify to a single constant times a volume unless this a_n-dependence is handled.",
+                "severity": "major",
+                "suggestion": "This is a substantive problem. The psi^{-1}(Qg_{nn}) factor depends on a_n through psi^{-1}(Qa_n). To handle this, either: (1) choose V_m more carefully to compensate (e.g., include a psi(Qa_n) factor in V_m), or (2) restrict the support of W further so that a_n is fixed, or (3) use a different fundamental domain / computation strategy. Option (1) seems most natural: define V_m(nak) = psi_{N_n}(n) \u00b7 psi(Qa_n k_{nn}) for g = nak in the support, which would make the product W\u00b7V have the psi-factors cancel completely. But this makes V_m depend on Q (hence on pi), which is allowed."
+              },
+              {
+                "location": "Convergence discussion",
+                "reason": "The proof never mentions convergence. Since both W and V_m are compactly supported mod N_n, the integral converges absolutely for all s \u2208 C, making meromorphic continuation trivial (the result is already entire, in fact constant). This should be noted explicitly to close the logical gap between 'the integral equals a constant for Re(s) >> 0' and 'the meromorphic continuation is a constant for all s'.",
+                "required_fix": "Add a remark: 'Since both W(iota(\u00b7)) and V_m are compactly supported mod N_n, the integral converges absolutely for all s in C. In particular, no meromorphic continuation is needed, and the result (a nonzero constant) holds for all s.'",
+                "severity": "minor",
+                "suggestion": "Insert this remark immediately before or after the final computation."
+              },
+              {
+                "location": "Lemma 5 (JPSS facts)",
+                "reason": "This lemma is stated but never used in the proof. The proof takes a fully computational route that bypasses the JPSS ideal machinery entirely. Unused lemmas clutter the presentation.",
+                "required_fix": "Either remove Lemma 5 or explain its role. If it is included for context/rigor, label it as a remark rather than a lemma in the proof's logical chain.",
+                "severity": "minor",
+                "suggestion": "Remove Lemma 5 or relabel as 'Remark (JPSS context)' and note it is not used in the computational proof but provides the theoretical backdrop."
+              }
+            ],
+            "perspective_name": "Correctness & Completeness",
+            "residual_concerns": [
+              "The BZ Kirillov model surjectivity used in Lemmas 3-4 is a deep result that is only cited vaguely. A precise statement with exact reference (theorem number and paper) would substantially improve verifiability.",
+              "The proof's quantifier structure gives 'there exists W' rather than the mentor's stronger 'for all nonzero W'. If the stronger result is true (via the JPSS ideal argument), it may be worth noting, but the weaker constructive result suffices for the problem.",
+              "The Haar measure normalization (D9 from the mentor) is used implicitly when computing vol(N_n \\ N_n K_n(m)). The exact value of this volume in terms of q and m should be stated for completeness."
+            ],
+            "reviewer_name": "claude_code"
+          },
+          {
+            "issues": [
+              {
+                "location": "Lemma 3, Lemma 4, and main proof body",
+                "reason": "The proof defines Whittaker functions $W$ and $V$ as characteristic functions $\\mathbf{1}_{N_n K_n(m)}$. Characteristic functions are $N_n$-invariant, whereas Whittaker functions must be $(N_n, \\psi)$-equivariant (e.g., $W(ng) = \\psi^{-1}(n)W(g)$). The defined functions are not in the specified Whittaker models.",
+                "required_fix": "Redefine $W$ and $V$ as the unique functions supported on $N_n K_n(m)$ that restrict to 1 on $K_n(m)$ and transform by $\\psi^{-1}$ (for $W$) and $\\psi$ (for $V$) under left translation by $N_n$.",
+                "severity": "major",
+                "suggestion": "Explicitly define $W$ such that $W(nk) = \\psi^{-1}(n)$ for $n \\in N_n, k \\in K_n(0)$ (and zero outside $N_n K_n(0)$). Justify that this is well-defined because $\\psi$ is trivial on $N_n \\cap K_n(0) = N_n(\\mathfrak{o})$ (due to conductor $\\mathfrak{o}$). Make the analogous definition for $V$."
+              },
+              {
+                "location": "Definition of $K_n(m)$",
+                "reason": "The definition $t \\in 1+\\mathfrak{p}^m$ is slightly ambiguous for $m=0$ if interpreted literally as $1+\\mathfrak{o}=\\mathfrak{o}$ without explicitly requiring invertibility (though $K_n(0)=G_n(\\mathfrak{o})$ is stated parenthetically).",
+                "required_fix": "Clarify the definition for the $m=0$ case.",
+                "severity": "minor",
+                "suggestion": "Simply state that for $m=0$, $K_n(0) = G_n(\\mathfrak{o})$, or ensure the definition implies $t \\in \\mathfrak{o}^\\times$."
+              },
+              {
+                "location": "Lemma 3 Proof",
+                "reason": "The citation 'multivariable Kirillov/mirabolic restriction input' is vague.",
+                "required_fix": "Cite the specific property allowing this choice of $W$.",
+                "severity": "minor",
+                "suggestion": "Reference the surjectivity of the restriction map from $\\mathcal{W}(\\Pi)$ to $C_c^\\infty(N_n \\backslash G_n, \\psi^{-1})$ (often part of the theory of the Kirillov model or derivatives)."
+              }
+            ],
+            "perspective_name": "Clarity & Rigor",
+            "residual_concerns": [],
+            "reviewer_name": "gemini_api"
+          },
+          {
+            "issues": [
+              {
+                "location": "Lemma 3 (choice of W)",
+                "reason": "The citation ('Bernstein\u2013Zelevinsky... Cogdell\u2013Piatetski-Shapiro... Matringe \u00a72, Prop. 2.4 + Lemma 2.1-type') is not a precise, verifiable reference for the exact claim that one can realize the quotient characteristic function 1_{N_nK_n(0)} via g -> W(diag(g,1)).",
+                "required_fix": "Provide an exact theorem (with full bibliographic data and theorem/proposition number) that gives this specific restriction/surjectivity statement, and check all hypotheses (group, character convention, model).",
+                "severity": "critical",
+                "suggestion": "Formulate the target function in the correct induced model first (psi^{-1}-equivariant), then cite a concrete surjectivity theorem for the mirabolic/Kirillov restriction map to realize it."
+              },
+              {
+                "location": "Lemma 4 (choice of V_m)",
+                "reason": "No concrete citation is given for the strong statement: for every generic pi and every m >= 0, there exists V_m with restriction exactly 1_{N_nK_n(m)} on N_n\\G_n. Standard newform/Howe-vector references often provide weaker or differently normalized support statements.",
+                "required_fix": "Either cite a theorem proving this exact statement as written, or weaken/modify the lemma to a cited version and adjust the main argument accordingly.",
+                "severity": "critical",
+                "suggestion": "Use an explicit newform/Howe-vector reference and, if needed, replace 'every m' by 'some m >= c(pi)' (which is enough for the Q(g_nn-1) in o step)."
+              },
+              {
+                "location": "Lemmas 3\u20134 statements versus cited Kirillov/mirabolic theory",
+                "reason": "The lemmas are phrased as left-N_n-invariant functions on N_n\\G_n, while Kirillov/mirabolic theorems are typically about psi^{\u00b11}-equivariant induced spaces. This mismatch means the cited results are not yet shown applicable.",
+                "required_fix": "Rewrite the lemmas in the correct equivariant function space and explicitly translate to the quotient notation used in the integral.",
+                "severity": "major",
+                "suggestion": "Define f(n g)=psi^{\u00b11}(n)f(g) with compact support modulo N_n, then identify its quotient support as N_nK_n(m) for integration."
+              },
+              {
+                "location": "Lemma 5 (JPSS citation)",
+                "reason": "The JPSS reference is too coarse for the exact package of claims (convergence domain, meromorphic continuation, rationality in q^{-s}, normalization yielding L^{-1} polynomial), and characteristic-scope is asserted but not sourced.",
+                "required_fix": "Add precise theorem/proposition numbers and a source explicitly covering the field-characteristic scope being used.",
+                "severity": "minor",
+                "suggestion": "Cite exact JPSS statements plus one modern reference (e.g., Cogdell notes/survey) that states the same local facts with current normalization conventions."
+              }
+            ],
+            "perspective_name": "Reference Validity",
+            "residual_concerns": [
+              "If the exact characteristic-function realizability fails, the proof strategy can still survive by replacing it with a weaker cited support-control statement and re-running the constant-on-support argument."
+            ],
+            "reviewer_name": "codex_cli"
+          }
+        ],
+        "summary": "The proof strategy is sound, but the definitions of Whittaker functions are mathematically incorrect (missing equivariance), and the integral computation lacks necessary steps regarding domain reduction and phase cancellation. The existence of the test vectors also needs a concrete citation.",
+        "verdict": "right_track"
+      },
+      "loop_index": 2
+    },
+    {
+      "editor_decision": {
+        "feedback": "Keep the right-translation reduction, but rebuild the proof around one rigorous core lemma. Either (a) give a complete constructive fixed-W argument (Kirillov support on a single Cartan/Iwasawa stratum, explicit monomial extraction, then spanning), or (b) cite an exact theorem statement (number + hypotheses) that already proves fixed-first-variable surjectivity; otherwise the proof is circular. Remove exploratory/retracted Steps (iv)-(v), and either remove Lemma 6 or supply the full factorization needed for its character claim. Define once and use consistently: raw image set, R-span, and ideal (R=C[q^{\u00b1s}]); do not deduce existence of one pair (W,V) with \u03a8=1 from ideal generation alone unless you prove representability. Correct the statement 'finite and nonzero for all s implies constant' (units c*q^{ms} are counterexamples) unless you add normalization that forces m=0. Add a citation matrix with precise source locations for each invoked fact (JPSS convergence/ideal structure, BZ Kirillov inclusion, and any mirabolic restriction/nonvanishing claim), and either fully complete the requested Iwasawa reduction or explicitly mark it as nonessential illustration.",
+        "feedback_target": "prover",
+        "reviewer_results": [
+          {
+            "issues": [
+              {
+                "location": "Lemma 4, Steps iv-vi",
+                "reason": "The proof of Lemma 4 contains two retracted sub-arguments (the left-multiplication approach that breaks equivariance, and the central-twist approach that only gives q^{-ns}), followed by a 'definitive argument' that is really a sketch citing external theorems. The mechanism by which BZ Kirillov model surjectivity implies surjectivity of the partial ideal is never made into a complete chain of deductions. At graduate rigor, appealing to 'one can achieve any prescribed polynomial' without showing how the Kirillov model parameter maps to the Laurent polynomial index is insufficient.",
+                "required_fix": "Either (a) provide a self-contained proof showing: pick a compact open $\\Omega$ where $\\Phi_W \\neq 0$, choose $V$ via BZ with Kirillov support on a single coset $\\varpi^m \\cdot \\mathfrak{o}^\\times \\cap \\Omega$, compute the resulting integral as $c_m q^{-ms} L(s,\\Pi\\times\\pi)$ for explicit $c_m \\neq 0$, and conclude the image ideal contains all monomials; or (b) cite the precise theorem statement from JPSS (1983) Theorem 2.7 that gives fixed-$W$ surjectivity, reproducing the exact statement and explaining how it applies here.",
+                "severity": "major",
+                "suggestion": "Option (a) is more instructive: use the Cartan decomposition $N_n \\backslash \\mathrm{GL}_n = \\bigsqcup_\\lambda N_n \\operatorname{diag}(\\varpi^{\\lambda_1},\\ldots,\\varpi^{\\lambda_n}) K_n$, choose $V$ in the Kirillov model supported on a single stratum, and show the integral localizes to a single term $c_\\lambda q^{-|\\lambda|(s-1/2)} L^{-1} \\cdot L = c_\\lambda q^{-|\\lambda|(s-1/2)}$. This makes the surjectivity mechanism transparent."
+              },
+              {
+                "location": "Lemma 4, Step v",
+                "reason": "The claim that $\\Phi_{W_0} \\not\\equiv 0$ for $W_0 \\neq 0$ is used crucially but justified only by the parenthetical remark 'by uniqueness of the Whittaker model and the non-vanishing of the restriction of $\\Pi$ to the mirabolic, this would force $W_0 = 0$'. This is a nontrivial fact from BZ derivative theory that requires either a proof or a precise citation.",
+                "required_fix": "Add a sub-lemma or remark: By BZ theory, the restriction of $\\Pi$ to the mirabolic $P_{n+1}$ is a representation of finite length whose Jordan-H\u00f6lder constituents are the derivatives $\\pi^{(k)}$ of $\\Pi$. A nonzero $W \\in \\mathcal{W}(\\Pi,\\psi^{-1})$ restricts to a nonzero function on $P_{n+1}$ (since $P_{n+1}$ contains $N_{n+1}$ and $W$ has nontrivial $N_{n+1}$-equivariance). The further restriction to $\\mathrm{GL}_n \\hookrightarrow P_{n+1}$ is nonzero because the $(N_n,\\psi^{-1})$-equivariant projection (the highest derivative) is nonzero for generic $\\Pi$. Cite BZ (1977) \u00a75 or Cogdell's lecture notes.",
+                "severity": "major",
+                "suggestion": "Alternatively, a simpler argument: if $W(\\operatorname{diag}(g,1)) = 0$ for all $g \\in \\mathrm{GL}_n(F)$, then $W$ vanishes on all of $\\mathrm{GL}_n(F) \\cdot N_{n+1}(F)$ (by $N_{n+1}$-equivariance applied to the last row). Since $\\mathrm{GL}_n(F) \\cdot N_{n+1}(F)$ generates a dense subgroup of $P_{n+1}(F)$, and $W$ is smooth, $W|_{P_{n+1}} = 0$. Then use that the big Bruhat cell $P_{n+1} w_0 P_{n+1}$ is open dense in $\\mathrm{GL}_{n+1}(F)$ to conclude $W = 0$."
+              },
+              {
+                "location": "Lemma 4, Step iv (retracted arguments)",
+                "reason": "The proof presents two failed approaches to establishing the module structure (left multiplication breaking equivariance, central twists only giving $q^{-ns}$) before abandoning the module-structure route entirely. These false starts are confusing and inappropriate in a final proof document.",
+                "required_fix": "Remove Steps (iv) and (v) entirely and go directly to Step (vi), which is the actual argument. If the module structure is not needed (as the proof eventually concedes), do not attempt to establish it.",
+                "severity": "minor",
+                "suggestion": "Restructure Lemma 4's proof as: (1) cite the key property of the BZ Kirillov model, (2) express $\\Psi(s;W,V)$ as a pairing between $\\Phi_W$ and the Kirillov model of $V$, (3) show the freedom in choosing $V$ spans the full ideal. This eliminates dead ends."
+              },
+              {
+                "location": "Gap Closure Note 3 (Integral Reduction)",
+                "reason": "The response begins an Iwasawa decomposition, switches to Cartan, notes that $g_{nn}$ is complicated, and then says the abstract approach makes this unnecessary. The editor asked for an explicit reduction; the response neither completes it nor cleanly declines.",
+                "required_fix": "Either complete the Iwasawa reduction showing how $\\psi(Qg_{nn})$ behaves on each stratum, or state clearly at the outset: 'The abstract right-translation reduction (Lemma 1) makes an explicit Iwasawa computation unnecessary for the proof. We include a partial computation for illustration only.' Currently the text trails off inconclusively.",
+                "severity": "minor",
+                "suggestion": "For a clean version: work in the Iwasawa decomposition $g = u \\cdot t \\cdot k$ with $t = \\operatorname{diag}(\\varpi^{m_1},\\ldots,\\varpi^{m_n})$. Then $g_{nn} = (tk)_{nn}$. For $k \\in K_n$ with $k_{nn} \\in \\mathfrak{o}^\\times$ (which holds on an open dense subset), $\\operatorname{val}(g_{nn}) = m_n$, so $Qg_{nn} \\in \\mathfrak{p}^{m_n - c(\\pi)}$. Then $\\psi(Qg_{nn}) = 1$ iff $m_n \\geq c(\\pi)$, giving an explicit characterization of where the character is trivial."
+              },
+              {
+                "location": "Step 1, Whittaker equivariance verification",
+                "reason": "The proof verifies $W_Q(u \\cdot g) = \\psi^{-1}_{N_{n+1}}(u) W_Q(g)$ for $u \\in N_{n+1}$, which is correct but unnecessary to verify separately \u2014 it follows immediately from $W_Q = \\rho(u_Q)W \\in \\mathcal{W}(\\Pi,\\psi^{-1})$ since right translation by a group element preserves the Whittaker model (as stated in the parenthetical). The verification is redundant.",
+                "required_fix": "No fix strictly required; this is a matter of concision. Optionally remove the explicit equivariance check and simply note that $\\rho(u_Q)$ preserves $\\mathcal{W}(\\Pi,\\psi^{-1})$ since it is the right-regular action of a group element on a smooth representation.",
+                "severity": "minor",
+                "suggestion": "Keep it if you want completeness, but acknowledge it's immediate rather than presenting it as a substantive verification step."
+              },
+              {
+                "location": "Lemma 3, Part (b)",
+                "reason": "The proof of the module structure in Lemma 3(b) claims that replacing $V(g)$ with $|\\det g|^m V(g)$ multiplies $\\Psi$ by $q^{-ms}$, but then corrects itself noting this changes $V$ to lie in $\\mathcal{W}(\\pi \\otimes |\\det|^m, \\psi)$ rather than $\\mathcal{W}(\\pi, \\psi)$, and offers an alternative via Hecke translates. The alternative (using $\\rho(\\operatorname{diag}(\\varpi,\\ldots,\\varpi,1))$-translates) is also not verified. This is the same issue that plagues Lemma 4.",
+                "required_fix": "Provide the correct mechanism for the module structure in Lemma 3(b): the ideal $\\mathcal{I}(\\Pi,\\pi)$ is a module over $\\mathbb{C}[q^s,q^{-s}]$ because multiplication by $q^{-s}$ can be achieved by replacing $W(g)$ with $W(\\operatorname{diag}(\\varpi,1,\\ldots,1) \\cdot g)$ (left translation by a diagonal element), which stays in $\\mathcal{W}(\\Pi,\\psi^{-1})$ \u2014 left translation by the center $\\varpi I_{n+1}$ multiplies $\\Psi$ by $|\\varpi|^{(n+1)(s-1/2)} = q^{-(n+1)(s-1/2)}$ while preserving equivariance. The key is that varying *both* $W$ and $V$ over their full models gives the module structure, since the pair $(\\Pi,\\pi)$ can absorb diagonal translations from both sides.",
+                "severity": "minor",
+                "suggestion": "Since Lemma 3 is a cited theorem (JPSS), it suffices to state the module structure as part of the cited result rather than re-proving it with errors. Simply state: 'The module structure follows from the JPSS framework; see [JPSS 1983, \u00a72] for details.'"
+              }
+            ],
+            "perspective_name": "Correctness & Completeness",
+            "residual_concerns": [
+              "The proof's strongest claim (Lemma 4) ultimately rests on a cited theorem whose precise statement is never reproduced verbatim from the source. If the cited result is Theorem 2.7 of JPSS (1983), one should verify that JPSS's statement actually gives fixed-W surjectivity and not just joint surjectivity \u2014 the distinction matters and the original paper's formulation should be checked.",
+              "The edge case $n = 1$ (where $\\pi$ is a character of $F^\\times$ and the Rankin-Selberg integral reduces to a Tate integral) is mentioned in passing in Step (iii) but never treated. While the argument applies uniformly, an explicit verification for this boundary case would strengthen confidence.",
+              "The proof gives the stronger result that ANY nonzero W works, but does not discuss whether this stronger statement is known in the literature or is a new observation. Contextualizing this would be valuable."
+            ],
+            "reviewer_name": "claude_code"
+          },
+          {
+            "issues": [
+              {
+                "location": "Lemma 4 (Surjectivity for Fixed W), especially Step (vi)",
+                "reason": "The proof hinges on the claim that for every nonzero fixed W, varying V gives all of L(s,Pi\u00d7pi)\u00b7C[q^{\u00b1s}], but this is asserted without a precise theorem statement/proof and is partly circular (the step invokes essentially the desired surjectivity).",
+                "required_fix": "Provide an exact, correctly scoped theorem (with theorem number and hypotheses) that proves fixed-first-variable surjectivity, or replace this route with an explicit test-vector construction that is fully checked.",
+                "severity": "critical",
+                "suggestion": "If such a theorem is unavailable in the cited sources, pivot to a constructive argument for a specific W (not 'any nonzero W') and prove existence of V for each pi directly."
+              },
+              {
+                "location": "Lemma 3(d) and Step 3 conclusion 'there exists (W**,V**) with \u03a8=1'",
+                "reason": "The argument conflates 'fractional ideal generated by integrals' with 'set of single integral values.' Being in the generated ideal does not automatically imply realization by one pair (W,V).",
+                "required_fix": "Distinguish clearly between the raw image set, its C-linear span, and the C[q^{\u00b1s}]-submodule generated by images; then prove representability of 1 by a single integral value if needed.",
+                "severity": "critical",
+                "suggestion": "State an explicit surjectivity statement for the map V \u21a6 \u03a8(s;W,V)/L (for fixed W) and use that directly; otherwise avoid claiming single-pair realization from ideal-generation alone."
+              },
+              {
+                "location": "Remark on interpretation and repeated claim 'finite/nonzero for all s implies nonzero constant'",
+                "reason": "As a function of s, units like c\u00b7q^{ms} are also finite and nonzero for all s; so the equivalence with 'constant' is false as stated.",
+                "required_fix": "Correct the equivalence and either (i) target nonvanishing entire functions, or (ii) explicitly normalize away Laurent-monomial units if constant value is desired.",
+                "severity": "major",
+                "suggestion": "Rephrase as 'nonzero unit in C[q^{\u00b1s}] (or C(q^{-s}) with no zeros/poles on C)' unless you prove additional normalization forcing m=0."
+              },
+              {
+                "location": "Lemma 4, Step (v): claim that \u03a6_W(g)=W(diag(g,1)) is nonzero whenever W\u22600",
+                "reason": "Injectivity/nonvanishing of this restriction is asserted without proof or exact citation; this is nontrivial and used to justify key density arguments.",
+                "required_fix": "Either provide a precise theorem proving injectivity of the relevant restriction map, or remove dependence on this claim.",
+                "severity": "major",
+                "suggestion": "Avoid this branch entirely if fixed-W surjectivity is cited/proved directly; otherwise include the exact mirabolic-restriction result and verify all hypotheses."
+              },
+              {
+                "location": "Lemma 6 and Step 2 character analysis",
+                "reason": "The text informally treats entries of a general matrix as if Whittaker character dependence can be read directly, without a proper N\u00b7(Levi) factorization argument.",
+                "required_fix": "Either provide the exact decomposition showing how \u03c8_N is extracted, or drop this lemma since right-translation reduction already handles the shift abstractly.",
+                "severity": "major",
+                "suggestion": "For rigor and clarity, remove Lemma 6 unless it is explicitly needed; it currently adds risk without strengthening the main proof."
+              },
+              {
+                "location": "Lemma 3 proof and citation layer",
+                "reason": "Several references are imprecise or mismatched to claims (e.g., archimedean citation for non-archimedean fixed-W property), and some subclaims (module closure mechanisms) are stated then retracted.",
+                "required_fix": "Provide exact theorem/proposition numbers for each property used: convergence/continuation, ideal generation, and any fixed-variable surjectivity.",
+                "severity": "major",
+                "suggestion": "Add a short citation matrix mapping each invoked fact to a precise source location and statement wording."
+              },
+              {
+                "location": "Notation around I(Pi,pi), J(W), I_pi(W)",
+                "reason": "Objects alternate between 'set of integral values,' 'span,' and 'ideal' without stable definitions, which obscures logical dependencies.",
+                "required_fix": "Define each object once with its algebraic type and keep usage consistent throughout.",
+                "severity": "minor",
+                "suggestion": "Introduce R:=C[q^{\u00b1s}], define Im(W):={\u03a8(W,V)}, Span_R(Im(W)), etc., before Step 3."
+              },
+              {
+                "location": "Lemma 4 Steps (i)-(iv)",
+                "reason": "The final proof includes exploratory dead-ends (e.g., failed equivariance under V_m) inside the main line, weakening exposition and perceived rigor.",
+                "required_fix": "Prune unsuccessful derivations from the proof body.",
+                "severity": "minor",
+                "suggestion": "Move heuristic/failed attempts to a remark or remove them entirely; keep one clean derivation path."
+              }
+            ],
+            "perspective_name": "Clarity & Rigor",
+            "residual_concerns": [
+              "Even after cleanup, the quantifier-strengthened claim 'any nonzero W works' may be too strong unless fixed-W surjectivity is explicitly validated from a primary source.",
+              "Normalization constants (measures/Whittaker normalization) may force \u03a8=c or c\u00b7q^{ms} rather than exactly 1 unless explicitly controlled."
+            ],
+            "reviewer_name": "codex_cli"
+          },
+          {
+            "issues": [
+              {
+                "location": "Lemma 4 (Proof Step vi)",
+                "reason": "Inappropriate citation context. The proof cites 'Jacquet, H., Archimedean Rankin\u2013Selberg Integrals (2009)' to justify a result in the non-archimedean (p-adic) setting. While the author notes 'specifically the non-archimedean case in earlier work,' this is imprecise referencing for a key lemma.",
+                "required_fix": "Remove the citation to the 2009 Archimedean paper or explicitly frame the result as a corollary of JPSS (1983) and Bernstein-Zelevinsky (1977).",
+                "severity": "minor",
+                "suggestion": "Cite Cogdell, J., 'L-functions and Converse Theorems for GL(n)' (2007) or simply state that Lemma 4 follows from the proof of Theorem 2.7 in JPSS (1983) combined with the density of the Kirillov model (BZ 1977), as you have already demonstrated in the text."
+              }
+            ],
+            "perspective_name": "Reference Validity",
+            "residual_concerns": [],
+            "reviewer_name": "gemini_api"
+          }
+        ],
+        "summary": "Reviewers agree the global strategy is plausible, but the proof is not complete at the required rigor because the key fixed-first-variable surjectivity claim (Lemma 4) is not established cleanly: the argument includes abandoned routes, a sketch that effectively assumes what it needs to prove, and imprecise/mismatched citations. Additional issues include an unproved nonvanishing restriction claim for \u03a6_W, conflation of ideal generation with representability by a single integral value, an incorrect equivalence between nonvanishing meromorphic behavior and constancy, and inconsistent object definitions (image vs span vs ideal).",
+        "verdict": "right_track"
+      },
+      "loop_index": 3
+    },
+    {
+      "editor_decision": {
+        "feedback": "You must fix the following before the proof can be accepted:\n\n(1) CRITICAL \u2014 Prove fixed-W surjectivity as a new Lemma 4. State: 'For generic (\u03a0,\u03c0) and any nonzero W\u2032 \u2208 W(\u03a0,\u03c8\u207b\u00b9), the set {\u03a8(s;W\u2032,V)/L(s,\u03a0\u00d7\u03c0) : V \u2208 W(\u03c0,\u03c8)} equals R.' Prove it using Kirillov model theory: restrict W\u2032 to the mirabolic embedding GL_n \u2192 GL_{n+1}; by BZ (Ann. Sci. ENS 1977, Thm 5.21), the Kirillov model of \u03c0 contains C_c^\u221e(F^{n-1}\\{0}); the resulting integral reduces to a Mellin transform on C_c^\u221e(F^\u00d7), which surjects onto C[q^s,q^{-s}]. Do NOT cite 'Theorem 2.7bis' \u2014 it does not exist.\n\n(2) REQUIRED \u2014 Add convergence and rationality. Before introducing A_\u03c0(W_Q), state: 'By JPSS Prop. 2.3, \u03a8(s;W_Q,V) converges absolutely for Re(s)\u226b0, admits meromorphic continuation as a rational function of q^{-s}, and \u03a8(s;W_Q,V)/L(s,\u03a0\u00d7\u03c0) \u2208 R.'\n\n(3) REQUIRED \u2014 State linearity. After defining A_\u03c0(W_Q), add: 'Since V\u21a6\u03a8(s;W_Q,V) is C-linear (by linearity of integration), A_\u03c0(W_Q) is a C-subspace of R.'\n\n(4) REQUIRED \u2014 Remove unused definitions S_\u03c0(W_Q) and J_\u03c0(W_Q). They add clutter and are never referenced.\n\n(5) REQUIRED \u2014 Restructure lemmas: Lemma 1 (right-translation), Lemma 2 (nonvanishing), Lemma 3 (JPSS ideal theorem \u2014 joint surjectivity, cited from Thm 2.7), Lemma 4 (fixed-W surjectivity, proved via Kirillov model), Lemma 5 (L\u207b\u00b9 \u2208 C[q\u207b\u02e2]).\n\n(6) REQUIRED \u2014 Fix the citation matrix: remove 'Theorem 2.7bis', cite Theorem 2.7 for joint surjectivity only, and attribute fixed-W surjectivity to your own Lemma 4 (proved from BZ Kirillov model theory).",
+        "feedback_target": "prover",
+        "reviewer_results": [
+          {
+            "issues": [
+              {
+                "location": "Core JPSS input / fixed-first-variable surjectivity claim",
+                "reason": "The proof cites 'JPSS (1983) Theorem 2.7 and Theorem 2.7bis' for the fixed-first-variable surjectivity A_\u03c0(W_Q) = R. There is no Theorem 2.7bis in JPSS (1983), and Theorem 2.7 only establishes the joint surjectivity over all (W,V) pairs. The single most important step in the proof has no valid justification.",
+                "required_fix": "Either prove the fixed-first-variable surjectivity from scratch using the Bernstein-Zelevinsky Kirillov model theory (as sketched in the Mentor output), or provide a correct citation. Candidate references: Cogdell-Piatetski-Shapiro 'Lectures on L-functions for GL_n' (Fields Institute monograph), or derive it from BZ's theorem that the Kirillov model of \u03c0 contains C_c^\u221e(F^{n-1} \\ {0}) combined with the Mellin transform interpretation of the integral.",
+                "severity": "critical",
+                "suggestion": "Add a 'Lemma 4' that states and proves fixed-W surjectivity. The argument: restrict W_Q to the mirabolic via the embedding GL_n \u2192 GL_{n+1}, use Kirillov model of \u03c0 to realize all compactly supported test functions in the integral, and invoke the surjectivity of the Mellin transform on C_c^\u221e(F^\u00d7) to show every Laurent polynomial in q^{-s} is achieved. This is roughly 10-15 lines and is the mathematical heart of the proof."
+              },
+              {
+                "location": "Definition of A_\u03c0(W_Q) and the claim A_\u03c0(W_Q) = R",
+                "reason": "The proof defines A_\u03c0(W_Q) as a raw image set but then claims it equals R without establishing R-module or even C-vector-space structure. Since V \u21a6 \u03a8(s;W_Q,V)/L is C-linear, the image is a C-subspace, but this linearity is never stated. The reader is left to wonder whether 'A_\u03c0 = R' means the raw set equals R (which would require a surjection) or the span equals R.",
+                "required_fix": "State explicitly that V \u21a6 \u03a8(s;W_Q,V)/L(s,\u03a0\u00d7\u03c0) is C-linear (by linearity of the integral in V), so A_\u03c0(W_Q) is a C-subspace of R. Then the surjectivity claim 'A_\u03c0(W_Q) = R' means this subspace is all of R, which follows from the Kirillov model argument.",
+                "severity": "major",
+                "suggestion": "After defining A_\u03c0(W_Q), add: 'Since V \u21a6 \u03a8(s;W_Q,V) is C-linear in V, A_\u03c0(W_Q) is a C-linear subspace of R.' Then the surjectivity claim becomes a linear algebra statement. Also, the definitions of S_\u03c0 and J_\u03c0 are never used in the proof \u2014 remove them to reduce clutter."
+              },
+              {
+                "location": "Lemma numbering and JPSS ideal theorem",
+                "reason": "The JPSS ideal theorem (that the joint image over all (W,V) is L\u00b7R) is used implicitly but never stated as a lemma. Meanwhile, 'Lemma 3' refers to L^{-1} being a polynomial, which is Lemma 5 in the Mentor's framework. The proof has an unnumbered core claim (fixed-W surjectivity) that is far more important than any of the stated lemmas but receives no lemma number or formal statement.",
+                "required_fix": "Restructure the lemmas: (1) Right-translation, (2) Nonvanishing, (3) JPSS ideal theorem (joint surjectivity, cited), (4) Fixed-W surjectivity (proved from Kirillov model), (5) L-inverse is a polynomial. This matches the Mentor's dependency graph and makes the logical structure transparent.",
+                "severity": "major",
+                "suggestion": "Adopt the Mentor's 5-lemma structure. The current Lemma 3 becomes Lemma 5, and the critical fixed-W result becomes Lemma 4 with a genuine proof."
+              },
+              {
+                "location": "Convergence and meromorphic continuation",
+                "reason": "The proof never mentions that \u03a8(s;W_Q,V) converges absolutely for Re(s) \u226b 0 and admits meromorphic continuation as a rational function of q^{-s}. These facts (from JPSS Prop. 2.3) are necessary to justify working with the integral as an element of C(q^{-s}) and dividing by L.",
+                "required_fix": "Add a sentence before the surjectivity argument: 'By [JPSS, Prop. 2.3], the integral \u03a8(s;W_Q,V) converges absolutely for Re(s) sufficiently large and admits meromorphic continuation to a rational function of q^{-s}; moreover, \u03a8(s;W_Q,V)/L(s,\u03a0\u00d7\u03c0) \u2208 R = C[q^s,q^{-s}].'",
+                "severity": "minor",
+                "suggestion": "This can be a one-sentence addition right after defining W_Q and before introducing A_\u03c0(W_Q)."
+              },
+              {
+                "location": "Gap Closure Note 8 / Citation matrix",
+                "reason": "The citation 'JPSS (1983), \u00a72, Theorem 2.7 and Theorem 2.7bis' for fixed-first-variable surjectivity is fabricated. There is no Theorem 2.7bis in the cited paper. Citing nonexistent theorem numbers undermines the proof's credibility.",
+                "required_fix": "Remove the phantom citation. Either cite a correct source or mark this as 'proved above' after adding the Kirillov-model argument.",
+                "severity": "minor",
+                "suggestion": "If using JPSS (1983) as primary reference, cite Theorem 2.7 only for the joint ideal result, and attribute the fixed-W strengthening to the Kirillov model argument proved in the paper itself."
+              }
+            ],
+            "perspective_name": "Correctness & Completeness",
+            "residual_concerns": [
+              "The proof claims 'any nonzero W works,' which is stronger than needed. While correct if the fixed-W surjectivity holds, the strength of this claim means the surjectivity proof must be airtight \u2014 there is no room for the argument to degrade gracefully.",
+              "The S_\u03c0(W_Q) and J_\u03c0(W_Q) definitions are introduced but never used, creating dead notation that may confuse readers about whether they play a role in the argument.",
+              "The Mentor's detailed exploration of the character-factor computation and BKL approach, while ultimately unnecessary for this proof strategy, contained useful intuition about *why* fixed-W surjectivity holds. The Prover's decision to discard all of this in favor of a (phantom) citation leaves the proof less self-contained than it should be at the graduate rigor level."
+            ],
+            "reviewer_name": "claude_code"
+          },
+          {
+            "issues": [
+              {
+                "location": "Complete Proof \u2014 claim \"Now use the core JPSS input ... A_pi(W_Q)=R\"",
+                "reason": "This is the central step and is stronger than the standard JPSS joint-image ideal statement. The proof does not derive it, and the cited reference is not explicitly shown to assert this exact fixed-first-variable surjectivity.",
+                "required_fix": "Provide an exact theorem statement (with precise citation) proving that for every nonzero W in W(Pi,psi^{-1}), the map V -> Psi(s;W,V)/L(s,Pi\u00d7pi) is surjective onto R; otherwise replace this with a direct construction yielding Psi=1.",
+                "severity": "critical",
+                "suggestion": "Add an \"Imported theorem\" subsection with theorem text (or precise paraphrase) and a notation dictionary matching JPSS notation to A_pi(W_Q)."
+              },
+              {
+                "location": "Definitions of A_pi(W_Q), S_pi(W_Q), J_pi(W_Q) and the step A_pi(W_Q)=R",
+                "reason": "A_pi(W_Q) is defined as a subset of C(q^{-s}), then identified with R without first stating that each normalized integral is Laurent-polynomial-valued for fixed W_Q.",
+                "required_fix": "Define a normalized map after meromorphic continuation with codomain R and justify that codomain via a cited theorem.",
+                "severity": "major",
+                "suggestion": "State explicitly: for fixed nonzero W_Q, Psi(s;W_Q,V)/L(s,Pi\u00d7pi) in R for all V, and its image equals R."
+              },
+              {
+                "location": "Gap Closure Notes \u2014 citation matrix row for fixed-first-variable surjectivity",
+                "reason": "The citation is too coarse for peer-review verification of the key lemma (theorem variant, numbering, and hypotheses are not concretely checked).",
+                "required_fix": "Give exact bibliographic coordinates and verify hypothesis matching (GL_{n+1}\u00d7GL_n case, genericity, character conventions, normalization context).",
+                "severity": "major",
+                "suggestion": "Add a short compatibility checklist immediately after the citation to show each assumption used in the proof is satisfied."
+              }
+            ],
+            "perspective_name": "Clarity & Rigor",
+            "residual_concerns": [
+              "If the cited JPSS result only gives ideal generation after varying both W and V, the universal fixed-W conclusion is not proved."
+            ],
+            "reviewer_name": "codex_cli"
+          },
+          {
+            "issues": [
+              {
+                "location": "Lemma 4 / Core Proof Argument",
+                "reason": "The proof attributes the 'fixed-first-variable surjectivity' (that integrals for fixed W span the ideal) directly to JPSS (1983) Theorem 2.7. However, Theorem 2.7 in that paper establishes the ideal structure for the joint span as both W and V vary. It does not explicitly state that fixing W preserves the ideal.",
+                "required_fix": "Modify the justification to acknowledge that JPSS 2.7 covers the joint case, and explain that the fixed-W result follows from the irreducibility of \u03c0 and the fact that the projection of V to the Kirillov model covers C_c^\u221e (Bernstein-Zelevinsky).",
+                "severity": "major",
+                "suggestion": "Replace the direct citation with a standard argument: 'Since the map V -> \u03a8(s, W, V) is a non-zero G-equivariant linear functional on \u03c0 (for fixed non-zero W), and \u03c0 is irreducible, the image ideal must be the same as the full ideal generated by all pairs (W, V), which is R by JPSS Thm 2.7.'"
+              },
+              {
+                "location": "Citation Matrix / Core Proof",
+                "reason": "The citation 'Theorem 2.7bis' in JPSS (1983) does not exist in the standard version of the paper (Amer. J. Math. 105).",
+                "required_fix": "Remove the reference to 'Theorem 2.7bis'.",
+                "severity": "minor",
+                "suggestion": "Cite Theorem 2.7 alone, or verify if a different proposition (e.g., Prop 2.3 or 2.4 regarding rationality) was intended."
+              }
+            ],
+            "perspective_name": "Reference Validity",
+            "residual_concerns": [
+              "The proof assumes without comment that the 'finite and nonzero' condition is satisfied by the constant function 1. While mathematically correct (1 is a non-zero constant), explicit confirmation that 'finite' refers to the analytic continuation is helpful."
+            ],
+            "reviewer_name": "gemini_api"
+          }
+        ],
+        "summary": "The proof architecture is correct and clean: right-translation reduction, fixed-W surjectivity, choice of V yielding \u03a8=1. However, the central claim (A_\u03c0(W_Q)=R for fixed nonzero W_Q) is neither proved nor correctly cited \u2014 'Theorem 2.7bis' does not exist in JPSS (1983), and Theorem 2.7 only gives joint surjectivity over all (W,V). Secondary issues include missing convergence/rationality justification, unstated linearity of V\u21a6\u03a8/L, unused definitions (S_\u03c0, J_\u03c0), and a phantom citation in the matrix. All issues are fixable within the current proof strategy.",
+        "verdict": "right_track"
+      },
+      "loop_index": 4
+    },
+    {
+      "editor_decision": {
+        "feedback": "Redesign the core argument for fixed-first-variable surjectivity: either (A) cite and apply an exact theorem that for every nonzero W the normalized image {Psi(s;W,V)/L} equals R, with hypotheses/normalizations verified, or (B) switch to an explicit construction/nondegeneracy strategy (e.g., controlled test vector choice and direct computation) that proves existence of V and Q giving a nonzero constant integral. Remove the current one-variable Tate reduction unless you provide a complete correct descent with formulas and theorem support. Restate Lemma 3 in generated-ideal language, provide full JPSS/BZ bibliographic anchors with exact statements used, and patch minor rigor items (W_Q stability in Whittaker model, m in Z in Mellin generation, and the unused C-subspace remark).",
+        "feedback_target": "mentor",
+        "reviewer_results": [
+          {
+            "issues": [
+              {
+                "location": "Lemma 4, step 2",
+                "reason": "The reduction of the normalized Rankin\u2013Selberg integral to a one-variable Tate zeta integral is asserted without computation. The mirabolic descent involves Iwasawa decomposition on GL_n, integration formula over the torus and compact subgroup, and identification of inner integrals \u2014 none of which is shown.",
+                "required_fix": "Provide the key steps of the descent: apply Iwasawa decomposition g = u\u00b7a\u00b7k on GL_n, integrate over K_n and N_n, and show how the resulting integral over the torus A_n reduces to the claimed Tate integral via the Kirillov model pairing with the restriction of W' to mirabolic data.",
+                "severity": "major",
+                "suggestion": "At minimum, write out the Iwasawa decomposition substitution, identify the integrand on the torus factor a = diag(a_1,...,a_n), and show which variables integrate out to leave a single |a_n|^s integral. Reference Cogdell\u2013PS-S \u00a72 or JPSS \u00a72 for the explicit unfolding."
+              },
+              {
+                "location": "Lemma 4, step 3",
+                "reason": "The passage from 'Kirillov model contains C_c^\u221e(F^{n-1}\\{0})' to 'the resulting \u03c6_V run through all C_c^\u221e(F^\u00d7)' via a 'last-coordinate projection' is unjustified. The projection involves integration against the restriction of W' to mirabolic data, and it is not shown that this projection is surjective onto C_c^\u221e(F^\u00d7) for every nonzero W'.",
+                "required_fix": "Show that the projection map (integration against the mirabolic restriction of W') sends C_c^\u221e(F^{n-1}\\{0}) surjectively onto C_c^\u221e(F^\u00d7) when W' is nonzero. This likely requires showing the mirabolic restriction of W' is nonzero on a sufficiently large set, or using a different factorization of the descent.",
+                "severity": "major",
+                "suggestion": "For n=1 (GL_2 \u00d7 GL_1 case), the descent is trivial since the Kirillov model is already on F^\u00d7. For n\u22652, one can use the fact that the restriction of a nonzero Whittaker function to the mirabolic is nonzero (by the embedding of \u03c0 into the Whittaker model via the mirabolic filtration), and then use a partition-of-unity / convolution argument to achieve arbitrary \u03c6 \u2208 C_c^\u221e(F^\u00d7) in the last coordinate. Alternatively, restructure the argument to avoid this projection step by working directly with the n-1 variable integral."
+              },
+              {
+                "location": "Main proof, definition of A_\u03c0(W_Q)",
+                "reason": "A_\u03c0(W_Q) is described as a C-subspace, but Lemma 4 proves it equals all of R. The proof works, but the algebraic structure claim is incomplete: A_\u03c0(W_Q) is in fact also an R-submodule (via |det|^m twists), and this stronger structure is what makes the 'ideal in a PID' argument from the mentor work. The prover avoids needing the module structure by proving surjectivity directly, which is fine, but the leftover 'subspace' language is potentially confusing.",
+                "required_fix": "Either (a) delete the sentence about C-subspace since it is not used in the subsequent argument, or (b) note that the R-module structure is not needed because Lemma 4 proves full surjectivity directly via Mellin transforms.",
+                "severity": "minor",
+                "suggestion": "Replace 'A_\u03c0(W_Q) is a C-subspace of R' with 'We will show A_\u03c0(W_Q) = R using Lemma 4' to streamline the logic."
+              },
+              {
+                "location": "Lemma 4, step 4",
+                "reason": "The Mellin surjectivity argument shows Z(\u03c6_m, s) = vol(o^\u00d7) q^{-ms} but does not explicitly state that m ranges over all of Z (including negative values), which is needed to generate both q^{-s} and q^{s} monomials spanning R = C[q^s, q^{-s}].",
+                "required_fix": "State explicitly that m \u2208 Z and that \u03c6_m = 1_{\u03d6^m o^\u00d7} \u2208 C_c^\u221e(F^\u00d7) for all m \u2208 Z, so the image contains all monomials q^{-ms} for m \u2208 Z.",
+                "severity": "minor",
+                "suggestion": "Add one sentence: 'Here m ranges over all of Z, so {q^{-ms} : m \u2208 Z} generates R as a C-algebra, hence the image is all of R.'"
+              },
+              {
+                "location": "Main proof, JPSS citation",
+                "reason": "The citation 'JPSS Prop. 2.3' and 'JPSS Theorem 2.7' lack precise references (which paper, which year). JPSS wrote multiple papers, and proposition numbering varies across versions and surveys.",
+                "required_fix": "Provide full citations: e.g., 'Jacquet, Piatetski-Shapiro, Shalika, Rankin\u2013Selberg convolutions, Amer. J. Math. 105 (1983), Proposition 2.3' or the equivalent in their Conducteur paper.",
+                "severity": "minor",
+                "suggestion": "Pin down the exact paper. The 'Prop. 2.3' convergence/rationality result is likely from JPSS 1983 (Amer. J. Math. 105), while 'Theorem 2.7' for the ideal structure may be from the same paper or from their earlier 1981 notes. Verify numbering against the source."
+              },
+              {
+                "location": "Lemma 1 / Main proof",
+                "reason": "The proof does not explicitly verify that W_Q = \u03c1(u_Q)W remains in W(\u03a0, \u03c8^{-1}). While this is true by definition of the Whittaker model (it is the space of all smooth functions W on G_{n+1} satisfying the N_{n+1}-equivariance, and this space is closed under right translation since \u03a0 is a representation of G_{n+1}), this should be stated.",
+                "required_fix": "Add a one-sentence justification: 'Since the Whittaker model W(\u03a0, \u03c8^{-1}) is the image of the smooth representation \u03a0 under the Whittaker functional, and \u03a0 is a representation of GL_{n+1}(F), the space W(\u03a0, \u03c8^{-1}) is stable under right translation. Hence W_Q \u2208 W(\u03a0, \u03c8^{-1}).'",
+                "severity": "minor",
+                "suggestion": "Insert this after the definition of W_Q in the main proof, before invoking Lemma 2."
+              }
+            ],
+            "perspective_name": "Correctness & Completeness",
+            "residual_concerns": [
+              "The proof proves a stronger result (every nonzero W works) than what is asked (existence of some W). While mathematically correct, one should verify the problem does not implicitly require a constructive or explicit W, in which case the non-constructive argument via surjectivity might need supplementation.",
+              "The entire argument rests on Lemma 4, whose proof at steps 2\u20133 requires substantial elaboration to reach graduate rigor. The current version reads more like an outline than a complete proof at those steps.",
+              "Measure normalizations: the Tate integral in step 4 uses d^\u00d7a (multiplicative Haar measure), but the normalization of this measure relative to the additive Haar measure and the quotient measure on N_n\\GL_n is not specified. The final constant 'vol(o^\u00d7)' depends on this normalization. Since the theorem only needs a nonzero constant (not the value 1 specifically), this does not affect correctness, but it means the claim '\u03a8 = 1' depends on appropriate normalization or should be stated as '\u03a8 = c for some c \u2208 C^\u00d7'."
+            ],
+            "reviewer_name": "claude_code"
+          },
+          {
+            "issues": [
+              {
+                "location": "Lemma 4, step 1",
+                "reason": "It is asserted that W' != 0 implies the restriction g -> W'(diag(g,1)) (or on mirabolic data) is nonzero. This is not proved and is generally not automatic for an arbitrary nonzero Whittaker function.",
+                "required_fix": "Either prove an injectivity/nonvanishing statement for the relevant restriction map, or replace the argument by choosing a specific W with verified nonzero restriction properties.",
+                "severity": "critical",
+                "suggestion": "Use an explicit test vector (e.g., essential Whittaker vector or a controlled translate) and compute/quote a nonvanishing value on the embedded subgroup directly."
+              },
+              {
+                "location": "Lemma 4, steps 2-3",
+                "reason": "The key claim (fixed-W surjectivity onto R) is not established. The reduction to a 1-variable Tate integral and the statement that phi_V runs over all C_c^infty(F^x) for fixed W' are asserted without a complete derivation or a precise theorem that states exactly this.",
+                "required_fix": "Provide a full proof with explicit descent formulas and a surjectivity argument for the map V -> phi_V for the fixed W', or cite a theorem whose statement exactly gives this fixed-first-variable surjectivity.",
+                "severity": "critical",
+                "suggestion": "If fixed-W surjectivity is unavailable in the literature, switch to an explicit construction route: build one universal W and verify directly that for each pi one can pick V giving a constant nonzero integral."
+              },
+              {
+                "location": "Lemma 3 statement",
+                "reason": "The text states set equality {Psi(W,V)} = L*R. JPSS usually identifies the fractional ideal/span generated by these integrals, not the raw set of values. The raw set need not be additively closed.",
+                "required_fix": "Restate Lemma 3 in ideal/span language: the R-submodule generated by all integrals equals L(s,Pi x pi)R.",
+                "severity": "major",
+                "suggestion": "Keep a separate notation for the generated ideal (e.g., I(Pi,pi)) and avoid equalities that imply individual realizability unless separately proved."
+              },
+              {
+                "location": "Citations in Lemmas 3-4",
+                "reason": "References are too imprecise for peer review: theorem/proposition numbers are given without exact bibliographic anchoring, and the cited BZ theorem is used for a stronger conclusion than stated.",
+                "required_fix": "Give full references (paper/book, year, section/theorem), quote the exact statement used, and verify hypotheses/conventions match (groups, characters, normalizations).",
+                "severity": "major",
+                "suggestion": "Add a short citation table: each nontrivial imported claim, exact source statement, and one-line justification of applicability."
+              },
+              {
+                "location": "Lemma 4 exposition/notation",
+                "reason": "Key objects and maps are introduced informally (G_n, P_n, iota, 'controlled by', 'last-coordinate projection', phi_V) without explicit formulas, which obscures the logical chain.",
+                "required_fix": "Define all symbols and provide the explicit sequence of equalities from Psi to the descended Tate integral, including any normalization constants.",
+                "severity": "minor",
+                "suggestion": "Insert a compact derivation block with equations and named maps so the reader can verify each transformation mechanically."
+              }
+            ],
+            "perspective_name": "Clarity & Rigor",
+            "residual_concerns": [
+              "If fixed-W surjectivity is not true as stated, the strengthened conclusion 'every nonzero W works' may fail; the theorem might still be true but would require a different argument (likely explicit universal test-vector construction)."
+            ],
+            "reviewer_name": "codex_cli"
+          },
+          {
+            "issues": [
+              {
+                "location": "Lemma 4 (Proof)",
+                "reason": "The proof claims that the Rankin\u2013Selberg integral for GL(n) x GL(n+1) reduces to a one-variable Tate zeta integral over F^x via 'mirabolic descent'. This is factually incorrect for n >= 1. The integral is over N_n \\ GL_n, which does not collapse to F^x in the manner described. BZ Thm 5.21 describes the Kirillov model of GL(n), but does not imply this integral reduction.",
+                "required_fix": "Remove the argument reducing the integral to a Tate zeta integral.",
+                "severity": "major",
+                "suggestion": "Prove Lemma 4 using the non-degeneracy of the Rankin\u2013Selberg pairing and the irreducibility of Pi. Specifically, argue that the map V -> Psi(s, W, V) is a nonzero functional for any W != 0 (by non-degeneracy). Since the image ideal is generated by L(s) (over all W), and the functional is unique up to scalar (by multiplicity one), the image for fixed W is L(s) * P(q^-s). Argue that P must be a unit because the pairing is non-degenerate for all s."
+              },
+              {
+                "location": "Lemma 4 (Statement)",
+                "reason": "The claim that the fixed-W image is exactly R (the unit ideal relative to L) is stated as a consequence of BZ 5.21, which is insufficient. While true that the image is an ideal, ensuring it contains 1 (i.e., that W is not a 'bad' vector generating a sub-ideal) requires the non-degeneracy argument mentioned above.",
+                "required_fix": "Strengthen the justification for why the ideal for a fixed W is the full ring R.",
+                "severity": "minor",
+                "suggestion": "Explicitly invoke the local functional equation or the non-degeneracy of the bilinear form Psi(s, -, -) to show that no nonzero W can be orthogonal to all V at any s."
+              }
+            ],
+            "perspective_name": "Reference Validity",
+            "residual_concerns": [],
+            "reviewer_name": "gemini_api"
+          }
+        ],
+        "summary": "The draft\u2019s high-level plan is plausible, but the proof fails at its core: Lemma 4 (fixed-W surjectivity) is not established and relies on a claimed descent to a one-variable Tate integral that reviewers identify as unjustified/incorrect in this GL_n x GL_{n+1} context. The steps asserting nonzero mirabolic restriction for arbitrary nonzero W' and surjectivity of the induced projection to C_c^infty(F^x) are also unproved, so the main conclusion Psi(...)=1 for fixed W is unsupported. Because this lemma is essential to the theorem, the current proof is not correct at graduate rigor. Additional issues (ideal-vs-set formulation, imprecise citations, and minor clarifications) are secondary and do not cure the central defect.",
+        "verdict": "wrong_track"
+      },
+      "loop_index": 5
+    }
+  ],
+  "max_loops": 5,
+  "meta_path": "/home/matt.linux/misc/first_proof/runs/2/20260211-210402-meta.json",
+  "problem_id": "2",
+  "researcher_text": "## Relevant Theorems\n1. **JPSS local Rankin\u2013Selberg theorem (joint image, not fixed-\\(W\\))**: for generic irreducible admissible \\((\\Pi,\\pi)\\) of \\(\\mathrm{GL}_{n+1}(F)\\times \\mathrm{GL}_n(F)\\), local zeta integrals converge for \\(\\Re(s)\\gg0\\), continue meromorphically (rational in \\(q^{-s}\\)), and the **joint** span over varying \\((W,V)\\) is a fractional ideal \\(L(s,\\Pi\\times\\pi)\\,\\mathbf C[q^{\\pm s}]\\).  \n   Source: JPSS, *Rankin\u2013Selberg Convolutions* (AJM 105 (1983)); see \u00a72, Theorem 2.7 / local theory.  \n   Link: https://doi.org/10.2307/2374264 (scan: https://www.math.columbia.edu/~hj/Rankin%20Selberg%20convolutions.pdf)\n\n2. **Rationality/convergence input used in local arguments**: each local integral is absolutely convergent in a right half-plane and extends to a rational function in \\(q^{-s}\\).  \n   Source: JPSS \u00a72 (commonly cited as Prop. 2.3 in later expositions).\n\n3. **Kirillov/mirabolic facts for generic representations**: restriction \\(W\\mapsto W|_{P_n}\\) is injective, and the Kirillov model contains a canonical submodule \\(\\tau(\\psi)=\\mathrm{ind}_{N_n}^{P_n}(\\psi)\\) (non-archimedean compact-induction version).  \n   Sources: Bernstein\u2013Zelevinsky and Jacquet\u2013Shalika; clear restatement in Cogdell Lecture 4 (Theorem 4.4 + discussion).  \n   Link: https://people.math.osu.edu/cogdell.1/fields-www.pdf\n\n4. **Existence of Kirillov model for nondegenerate irreducibles of \\(\\mathrm{GL}_n\\)**: equivalent mirabolic formulation appears as Bernstein\u2013Zelevinsky Theorem 4.9 + Remark 4.10 in Ann. ENS 1977.  \n   Link: https://www.numdam.org/item/10.24033/asens.1333.pdf  \n   DOI: https://doi.org/10.24033/asens.1333\n\n5. **Laurent-polynomial/Mellin generation on \\(F^\\times\\)**: Mellin transforms of compactly supported shell functions (e.g. \\(1_{\\varpi^m\\mathfrak o^\\times}\\)) produce monomials \\(q^{-ms}\\); finite linear combinations give \\(\\mathbf C[q^{\\pm s}]\\).  \n   Standard Tate-style local zeta fact, used as the last step once one reduces to a one-variable determinant Mellin transform.\n\n6. **\\(L^{-1}\\) polynomiality**: with JPSS normalization, \\(L(s,\\Pi\\times\\pi)=P(q^{-s})^{-1}\\), \\(P(0)=1\\), so \\(L^{-1}\\in \\mathbf C[q^{-s}]\\subset \\mathbf C[q^{\\pm s}]\\).\n\n## Key Definitions\n1. \\(u_Q = I_{n+1}+Q E_{n,n+1}\\), with \\(Q\\mathfrak o=\\mathfrak q(\\pi)^{-1}\\).\n\n2. Shifted integral:\n\\[\n\\Psi(s;W,V;u_Q)=\\int_{N_n\\backslash \\mathrm{GL}_n(F)}W(\\mathrm{diag}(g,1)u_Q)V(g)|\\det g|^{s-\\frac12}dg.\n\\]\n\n3. Right translation: \\((\\rho(h)W)(x)=W(xh)\\), so \\(\\Psi(s;W,V;u_Q)=\\Psi(s;\\rho(u_Q)W,V)\\).\n\n4. Ring \\(R:=\\mathbf C[q^{\\pm s}]\\).\n\n5. For fixed nonzero \\(W'\\), raw image\n\\[\n\\mathcal A_\\pi(W'):=\\{\\Psi(s;W',V)/L(s,\\Pi\\times\\pi):V\\in\\mathcal W(\\pi,\\psi)\\}\\subset R.\n\\]\n\n6. Units of \\(R\\): exactly \\(c\\,q^{-ms}\\) (\\(c\\in\\mathbf C^\\times,\\ m\\in\\mathbf Z\\)).\n\n7. Important interpretation: \u201cfinite and nonzero for all \\(s\\)\u201d means no poles/zeros on \\(s\\in\\mathbf C\\), hence a unit \\(c\\,q^{-ms}\\), not necessarily a constant.\n\n## Proof Strategies\n1. **Editor-requested main route**: prove a new fixed-\\(W\\) lemma:\n\\[\n\\mathcal A_\\pi(W')=R \\quad\\text{for every nonzero }W'\\in\\mathcal W(\\Pi,\\psi^{-1}).\n\\]\nThen choose \\(P=L^{-1}\\in R\\) to get \\(V\\) with \\(\\Psi(s;W',V)=1\\).\n\n2. **How to prove that lemma (recommended structure)**:\n   - Use mirabolic restriction \\(W'|_{\\mathrm{diag}(G_n,1)}\\) and injectivity/nonvanishing.\n   - Use \\(\\tau(\\psi)\\subset K(\\pi,\\psi)\\) to realize sufficiently flexible compactly supported test data in \\(V\\).\n   - Reduce the normalized integral to a determinant Mellin transform.\n   - Use shell functions to generate monomials \\(q^{-ms}\\), hence all of \\(R\\).\n\n3. **Then finish globally for the question**:\n   - Fix any nonzero \\(W\\in\\mathcal W(\\Pi,\\psi^{-1})\\).\n   - For each \\((\\pi,Q)\\), set \\(W_Q=\\rho(u_Q)W\\neq0\\).\n   - Apply fixed-\\(W\\) surjectivity to \\(W_Q\\), pick \\(V\\) giving \\(L^{-1}\\), conclude \\(\\Psi(s;W,V;u_Q)=1\\).\n\n## Gaps and Concerns\n1. **Critical**: JPSS Theorem 2.7 gives joint \\((W,V)\\)-surjectivity/ideal generation, not obviously fixed-first-variable surjectivity. That fixed-\\(W\\) statement must be proved (or cited precisely from another source).\n\n2. **Citation correction**: do not cite \u201cTheorem 2.7bis\u201d from JPSS; this was flagged repeatedly as invalid/unsupported. Use Theorem 2.7 only for the joint ideal statement.\n\n3. **Must state analytic setup explicitly** before \\(\\mathcal A_\\pi(W')\\): convergence for \\(\\Re(s)\\gg0\\), meromorphic continuation, and normalized values in \\(R\\).\n\n4. **Must state linearity**: \\(V\\mapsto \\Psi(s;W',V)\\) is \\(\\mathbf C\\)-linear, so \\(\\mathcal A_\\pi(W')\\) is a \\(\\mathbf C\\)-subspace of \\(R\\).\n\n5. **Notation hygiene**: keep raw image vs span vs ideal distinct; avoid unused objects.\n\n6. **Interpretation hygiene**: \u201cfinite/nonzero for all \\(s\\)\u201d corresponds to units \\(c q^{-ms}\\); if you need literal constant \\(1\\), that is stronger and requires choosing \\(P=L^{-1}\\) explicitly.",
+  "started_at": "2026-02-11T21:04:02.407673+00:00",
+  "transcript_path": "/home/matt.linux/misc/first_proof/runs/2/20260211-210402-transcript.md"
+}

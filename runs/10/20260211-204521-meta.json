@@ -1,0 +1,597 @@
+{
+  "executed_loops": 5,
+  "final_verdict": "right_track",
+  "finished_at": "2026-02-11T21:24:19.400720+00:00",
+  "input_hashes": {
+    "background_sha256": "2cc993fe983f0289c641a0b6411d6221d46eafb74b1a2ac58895e053568c1747",
+    "question_sha256": "6541ff18de2f7f16c07f35c8aed9bc28796495575fbfea44a17336568347c319"
+  },
+  "issue_counts": {
+    "critical": 1,
+    "major": 18,
+    "minor": 36
+  },
+  "latex_path": "/home/matt.linux/misc/first_proof/runs/10/20260211-204521-report.tex",
+  "loops": [
+    {
+      "editor_decision": {
+        "feedback": "Revise the proof in this order: (1) add a Problem Setup paragraph before Part 1 stating the masked regularized least-squares objective and derive Aw=b directly from its gradient; (2) standardize notation globally to mode-k unfolding T_(k), define observed-data masking explicitly (e.g., T_Omega = 1_Omega \\odot T_(k)), and define B consistently as T_Omega Z so the sparse accumulation in Lemma 3 is exactly the stated object; (3) replace Lemma 6 with the textbook PCG result on \\hat A = P^{-1/2}AP^{-1/2}, include the explicit error transform \\hat e_m = P^{1/2}e_m, and use the standard minimax/Chebyshev identity 1/T_m((\\lambda_max+\\lambda_min)/(\\lambda_max-\\lambda_min)) <= 2((sqrt\\kappa-1)/(sqrt\\kappa+1))^m; remove the incorrect intermediate bound and incomplete display; (4) move preconditioner-quality claims to a clearly labeled heuristic remark unless you provide a formal sampling model and spectral-equivalence theorem; (5) make minor clarity fixes: remove += pseudocode from theorem claims, clean Part 3 complexity wording without unnecessary nr<=qr justification, and in Part 4 include the extra O(q(d-1)r) setup term when z_t are generated on-the-fly.",
+        "feedback_target": "prover",
+        "reviewer_results": [
+          {
+            "issues": [
+              {
+                "location": "Lemma 3 / RHS definition (and theorem definitions of b, B)",
+                "reason": "The proof implicitly replaces B = T_{(k)}Z with a sparse observed-only accumulation, but that is only equal if T is explicitly the masked tensor T_\u03a9 := 1_\u03a9 \u2299 T (or unobserved entries are defined as zero). As written, if T denotes the full tensor, the computed B is not T_{(k)}Z, so b is mismatched.",
+                "required_fix": "State explicitly that the objective uses T_\u03a9 (observed entries only), redefine B as B := T_\u03a9 Z, and derive b from normal equations as b = (Z \u2297 K)^T P_\u03a9 vec(T) = vec(KB).",
+                "severity": "major",
+                "suggestion": "Add a short derivation from the masked least-squares objective to the normal equations so the sparse accumulation formula for B is unambiguous and exact."
+              },
+              {
+                "location": "Lemma 6 (PCG convergence proof)",
+                "reason": "One displayed line is incomplete (`(P^{-1/2} A P^{-1/2} \\hat e_m)^T \\cdot ...`), and the Chebyshev minimax bound is written in a nonstandard form without justification. This weakens rigor at graduate level.",
+                "required_fix": "Replace that segment with a clean standard statement: CG on \\hat A = P^{-1/2}AP^{-1/2} gives \\|e_m\\|_A = \\|\\hat e_m\\|_{\\hat A} and the textbook bound with \u03ba(\\hat A).",
+                "severity": "minor",
+                "suggestion": "Either cite a standard theorem directly or provide the exact minimax identity \\(\\min_{p(0)=1}\\max_{\\lambda\\in[a,b]}|p(\\lambda)| = 1/|T_m((a+b)/(b-a))|\\) before the final inequality."
+              },
+              {
+                "location": "Gap Closure Note 7 (preconditioner quality discussion)",
+                "reason": "The claim that balanced sampling makes A spectrally close to a Kronecker form is heuristic and not proved (no sampling model, no concentration/spectral bounds).",
+                "required_fix": "Either remove this as a proof claim or formalize a sampling assumption (e.g., i.i.d. Bernoulli/uniform without replacement) and prove explicit spectral-equivalence bounds.",
+                "severity": "minor",
+                "suggestion": "Keep the theorem\u2019s unconditional PCG bound in terms of \u03ba, and move small-\u03ba intuition to a separate remark labeled as heuristic unless a formal lemma is added."
+              }
+            ],
+            "perspective_name": "Correctness & Completeness",
+            "residual_concerns": [
+              "Uniqueness of observed pairs is implicitly used via \u03a9 as a set; if duplicate observations are allowed, define how they are aggregated and how S, P_\u03a9 are modified."
+            ],
+            "reviewer_name": "codex_cli"
+          },
+          {
+            "issues": [
+              {
+                "location": "Lemma 6, Chebyshev bound derivation",
+                "reason": "The intermediate expression involving 2/(1 + T_m(...)^{-1}) is not a standard or correct form of the Chebyshev minimax bound. The correct minimax value is 2/T_m((kappa+1)/(kappa-1)), and the displayed formula does not reduce to this.",
+                "required_fix": "Replace the intermediate bound with the standard form: min_{p} max_{mu} |p(mu)| = 1/T_m((kappa+1)/(kappa-1)) <= 2((sqrt(kappa)-1)/(sqrt(kappa)+1))^m.",
+                "severity": "major",
+                "suggestion": "Use the standard two-step derivation: (1) the minimax polynomial on [lambda_min, lambda_max] with p(0)=1 has value 1/T_m((lambda_max+lambda_min)/(lambda_max-lambda_min)), (2) bound T_m from below using the exponential identity. Cite Golub & Van Loan or Saad's textbook for the clean statement."
+              },
+              {
+                "location": "Lemma 3 / overall proof structure",
+                "reason": "The optimization objective that gives rise to the normal equations Aw = b is never stated in the main proof. The RHS b is defined algebraically but the reader cannot verify its correctness without knowing what is being minimized. This appears only in gap closure note 5, which is too late.",
+                "required_fix": "State the optimization problem (regularized least-squares on observed entries) before Part 1, and derive the normal equations Aw = b from it. This makes the SPD property of A and the form of b self-evident.",
+                "severity": "major",
+                "suggestion": "Add a 'Problem Setup' paragraph before Part 1 that states: we seek w minimizing (1/2)||P_Omega(vec(T_{(k)}) - (Z otimes K)w)||^2 + (lambda/2) w^T (I_r otimes K) w. Then the gradient set to zero gives Aw = b. This also clarifies why only observed entries appear in b."
+              },
+              {
+                "location": "Definitions / Lemma 3",
+                "reason": "The mentor defines B = TZ where T is the full tensor, but Lemma 3 uses B = T_{(k)} Z where T_{(k)} is the mode-k unfolding. These are different mathematical objects and the conflation is never resolved.",
+                "required_fix": "Consistently use T_{(k)} (the mode-k matricization) throughout. The mentor's notation section should define T_{(k)} and use it in the definition of B.",
+                "severity": "major",
+                "suggestion": "In the Definitions section, add: 'Let T_{(k)} in R^{n x M} denote the mode-k unfolding of T.' Then replace B = TZ with B = T_{(k)}Z everywhere. This small fix eliminates a genuine ambiguity."
+              },
+              {
+                "location": "Lemma 6, error transformation",
+                "reason": "The identity e_m = P^{-1/2} hat{e}_m is asserted with an incomplete derivation. The proof writes 'More directly: since e_m = P^{-1/2} hat{e}_m' without showing why, then uses this to equate the A-norm and hat{A}-norm.",
+                "required_fix": "Add a one-line derivation: since hat{w}_m = P^{1/2} w_m and hat{w}_* = P^{1/2} w_*, we get hat{e}_m = P^{1/2} e_m, hence e_m = P^{-1/2} hat{e}_m.",
+                "severity": "minor",
+                "suggestion": "Replace the 'More directly' paragraph with an explicit substitution showing the chain hat{e}_m = hat{w}_m - hat{w}_* = P^{1/2}(w_m - w_*) = P^{1/2} e_m. Then ||e_m||_A = ||hat{e}_m||_{hat{A}} follows by expanding the quadratic forms."
+              },
+              {
+                "location": "Part 3, complexity simplification",
+                "reason": "The claim 'nr <= qr by assumption n < q' is used to justify dropping the O(nr) initialization cost, but the final complexity O(qr + n^2r) already subsumes O(nr) regardless. The dominance relationship between n^2r and qr is never discussed.",
+                "required_fix": "Remove the unnecessary justification 'since nr <= qr by assumption n < q'. Instead, note that the two dominant terms are qr (from the accumulation loop) and n^2r (from two kernel multiplies), and the total is O(qr + n^2r) without further simplification.",
+                "severity": "minor",
+                "suggestion": "Briefly note that if q >= n^2 the accumulation loop dominates, and if q < n^2 the kernel multiplies dominate, so both terms must be retained in the bound."
+              },
+              {
+                "location": "Part 4 / Part 3, on-the-fly z_t cost",
+                "reason": "Part 3 notes that on-the-fly computation of z_t adds O(q(d-1)r) to the matvec cost, but Part 4 does not account for the same cost when forming G_Omega during preconditioner setup.",
+                "required_fix": "Add a note in Part 4 that if z_t vectors are generated on-the-fly, the setup cost for G_Omega becomes O(q(d-1)r + qr^2) rather than O(qr^2).",
+                "severity": "minor",
+                "suggestion": "Add a parenthetical remark after 'total O(qr^2)' in the G_Omega formation step: '(plus O(q(d-1)r) if z_t are generated on-the-fly, as in Part 3).'"
+              },
+              {
+                "location": "Theorem statement, claim 2",
+                "reason": "The += notation in the theorem statement is pseudocode, not standard mathematical notation. At graduate rigor level, a theorem statement should use purely mathematical language.",
+                "required_fix": "Reformulate claim 2 to describe the matvec algorithm in mathematical terms, reserving pseudocode for an 'Algorithm' environment or a remark.",
+                "severity": "minor",
+                "suggestion": "Replace the algorithmic steps in the theorem statement with: 'A vec(V) = vec(K(CZ + lambda KV)) where C_i,: = sum_{t: i_t=i} <(KV)_i,:, z_t> z_t.' Then present the four-step procedure as Algorithm 1 or as a remark after the theorem."
+              },
+              {
+                "location": "Gap closure note 7",
+                "reason": "The qualitative discussion of preconditioner quality uses informal approximations ('approximately uniform', 'spectrally close to a scalar multiple') without any formal statement or reference.",
+                "required_fix": "Either provide a concrete spectral equivalence bound (even under simplifying assumptions) or cite a specific result from the tensor completion / kernel learning literature.",
+                "severity": "minor",
+                "suggestion": "Consider adding: 'For a formal treatment of spectral equivalence bounds for Kronecker preconditioners in sampled settings, see [reference].' If no suitable reference exists, state explicitly that bounding kappa in terms of sampling parameters is an open question or deferred to future work."
+              }
+            ],
+            "perspective_name": "Clarity & Rigor",
+            "residual_concerns": [
+              "The proof assumes throughout that the observations (i_t, m_t) are distinct (no repeated indices in Omega). If repeated observations are allowed, the projector P_Omega = SS^T is no longer idempotent and the masking interpretation breaks down. This edge case should be stated as an assumption or handled.",
+              "Numerical stability of the accumulation loop (gap closure note 3) is mentioned but the floating-point error bound O(q epsilon_mach) is stated without justification. For very large q, compensated summation or other techniques may be needed, which could affect the practical complexity.",
+              "The proof never specifies the vectorization convention (column-major vs row-major). The Kronecker-vec identity (C otimes A)vec(B) = vec(ABC^T) assumes column-major (vec stacks columns). If the implementation uses a different convention, the Kronecker ordering would need to be transposed. Assumption 4 from the mentor mentions consistency but this should be made explicit."
+            ],
+            "reviewer_name": "claude_code"
+          },
+          {
+            "issues": [],
+            "perspective_name": "Reference Validity",
+            "residual_concerns": [],
+            "reviewer_name": "gemini_api"
+          }
+        ],
+        "summary": "The proof uses the right overall strategy and most algebraic components are directionally correct, but it does not yet meet graduate-level rigor because key setup and consistency pieces are missing or flawed: the objective and normal equations are not stated upfront, RHS definitions are inconsistent (full tensor vs masked observed data; B = TZ vs B = T_(k)Z), and Lemma 6 contains an incomplete derivation plus a nonstandard/incorrect Chebyshev bound expression. The preconditioner-quality discussion is currently heuristic without formal assumptions or proof. Remaining comments are presentation/consistency refinements rather than fundamental redesign.",
+        "verdict": "right_track"
+      },
+      "loop_index": 1
+    },
+    {
+      "editor_decision": {
+        "feedback": "Address the following in the next revision:\n\n1. **Lemma 6 \u2014 PCG/CG equivalence (major).** Either (a) add a proof sketch showing that the PCG recurrences (with preconditioner P) map to standard CG recurrences under the substitution \u0175 = P^{1/2}w, or (b) provide a single precise citation with full bibliographic details (author, title, edition, year, theorem/algorithm number). Option (b) is sufficient at graduate level. Suggested reference: Saad, Y., *Iterative Methods for Sparse Linear Systems*, 2nd edition, SIAM, 2003, Algorithm 9.1 and the discussion preceding it.\n\n2. **Lemma 6 \u2014 Exact-arithmetic hypothesis (major).** Add one sentence before the convergence bound stating explicitly that it holds in exact arithmetic. E.g.: 'In exact arithmetic, the preconditioned CG method satisfies the following error bound.'\n\n3. **Lemma 6 \u2014 Precise citation (major).** Replace the current dual citation ('Saad ... Theorem 6.29, or Golub & Van Loan, \u00a711.3') with one definitive reference including full bibliographic details and the specific theorem/equation number for the minimax Chebyshev bound used.\n\n4. **Part 1 \u2014 Solution uniqueness (minor).** After concluding A is SPD, add: 'Since A is SPD, it is invertible, and the system Aw = b has a unique solution w* = A^{-1}b.'\n\n5. **Lemma 6 \u2014 Intermediate algebra (minor).** Show the step: ((\u03ba+1)/(\u03ba\u22121))\u00b2 \u2212 1 = ((\u03ba+1)\u00b2 \u2212 (\u03ba\u22121)\u00b2)/(\u03ba\u22121)\u00b2 = 4\u03ba/(\u03ba\u22121)\u00b2, so \u221a(x\u00b2\u22121) = 2\u221a\u03ba/(\u03ba\u22121).\n\n6. **Part 4/5 \u2014 Storage bounds (minor).** Add one sentence noting that all stored objects (Cholesky factors L_K \u2208 \u211d^{n\u00d7n}, L_G \u2208 \u211d^{r\u00d7r}, cached z_t vectors, working matrices) total O(n\u00b2 + r\u00b2 + qr + nr) storage, none of which is O(N).\n\n7. **Notation \u2014 Vectorization bijection (minor).** Define the column-major bijection \u03c6: [n]\u00d7[M] \u2192 [N] explicitly and write S's columns as e_{\u03c6(i_t,m_t)}.\n\n8. **Gap Closure Note 10 \u2014 Stability claim (minor).** Either remove the claim that Cholesky factorizations are 'numerically stable' or qualify it with a citation (e.g., Higham, *Accuracy and Stability of Numerical Algorithms*, 2nd ed., SIAM, 2002, Theorem 10.3).",
+        "feedback_target": "prover",
+        "reviewer_results": [
+          {
+            "issues": [
+              {
+                "location": "Lemma 6 / Part 5",
+                "reason": "The equivalence between PCG on (A, P) and standard CG on the transformed system is asserted without proof or precise citation. At graduate rigor, this non-trivial equivalence (that PCG iterates satisfy w_m = P^{-1/2} hat_w_m where hat_w_m are CG iterates on the transformed system) requires justification.",
+                "required_fix": "Either prove the equivalence by showing the PCG recurrences (preconditioned residuals, search directions, step sizes) map to the standard CG recurrences under the substitution, or provide a precise citation (e.g., Saad, Iterative Methods for Sparse Linear Systems, Theorem 9.1 or Algorithm 9.1).",
+                "severity": "major",
+                "suggestion": "Add a short proof sketch: define the preconditioned residual r\u0302_m = P^{-1} r_m, show that the PCG update rules for (w_m, r_m, p_m) with M = P correspond to CG rules for (\u0175_m, r\u0302_m, p\u0302_m) on the system P^{-1/2} A P^{-1/2}, and note this is a standard result with citation."
+              },
+              {
+                "location": "Part 1 / after SPD proof",
+                "reason": "The proof establishes A is SPD but does not explicitly state the immediate consequence that Aw = b has a unique solution. For completeness at graduate level, this should be noted.",
+                "required_fix": "Add one sentence after the SPD conclusion: 'Since A is SPD, it is invertible, and the system Aw = b has a unique solution w* = A^{-1}b.'",
+                "severity": "minor",
+                "suggestion": "Insert this sentence at the end of Part 1, before the PSD kernel remark."
+              },
+              {
+                "location": "Lemma 6, Chebyshev bound derivation",
+                "reason": "The intermediate step sqrt((\u03ba+1)\u00b2/(\u03ba-1)\u00b2 - 1) = 2\u221a\u03ba/(\u03ba-1) is used but not shown. While straightforward, omitting intermediate algebra in a key bound weakens the self-contained nature of the proof.",
+                "required_fix": "Show the computation: ((\u03ba+1)/(\u03ba-1))\u00b2 - 1 = ((\u03ba+1)\u00b2 - (\u03ba-1)\u00b2)/(\u03ba-1)\u00b2 = 4\u03ba/(\u03ba-1)\u00b2, so the square root is 2\u221a\u03ba/(\u03ba-1).",
+                "severity": "minor",
+                "suggestion": "Add a one-line computation between the display of x + \u221a(x\u00b2-1) and the final simplification."
+              },
+              {
+                "location": "Part 4, preconditioner setup and apply",
+                "reason": "The 'no O(N) operation' claim in Part 5 covers computation but storage is only implicitly addressed. The Cholesky factors and all intermediate matrices should be explicitly noted as sub-N in storage.",
+                "required_fix": "Add a brief statement in Part 4 or Part 5 noting that storage is O(n\u00b2 + r\u00b2 + nr + qr) (Cholesky factors, working matrices, sampled Khatri-Rao rows), none of which is O(N).",
+                "severity": "minor",
+                "suggestion": "Extend Gap Closure Note 11 or add a sentence in Part 4 after the cost analysis: 'Storage for all precomputed objects (Cholesky factors L_K, L_G, and cached z_t vectors) totals O(n\u00b2 + r\u00b2 + qr), well below O(N).'"
+              }
+            ],
+            "perspective_name": "Correctness & Completeness",
+            "residual_concerns": [
+              "The proof treats the Khatri-Rao rows z_t as either precomputed or generated on-the-fly, but does not discuss the storage implications of precomputing all q rows (O(qr) storage) versus the computational overhead of regenerating them at each matvec. A brief note on this tradeoff would strengthen the practical completeness of the complexity analysis.",
+              "The PSD kernel remark (end of Part 1) mentions restricting to range(K) as a remedy but does not elaborate on how this affects the dimensions of the system or the complexity bounds. If this case is meant to be supported, it deserves at least a sentence on the modified system dimensions."
+            ],
+            "reviewer_name": "claude_code"
+          },
+          {
+            "issues": [
+              {
+                "location": "Notation / Problem Setup",
+                "reason": "The notation $e_{(i_t, m_t)}$ for the columns of $S$ is slightly informal, as standard basis vectors are typically indexed by a single integer.",
+                "required_fix": "Formalize the vectorization mapping.",
+                "severity": "minor",
+                "suggestion": "Explicitly define the column-major bijection $\\phi: [n] \\times [M] \\to [N]$ and denote the columns as $e_{\\phi(i_t, m_t)}$ to maintain strict rigor."
+              }
+            ],
+            "perspective_name": "Clarity & Rigor",
+            "residual_concerns": [
+              "While the proof of the convergence *rate* (dependent on $\\kappa$) is rigorous, the practical utility of the theorem relies on $\\kappa$ being small. The 'Heuristic Remark' addresses this qualitatively, but a rigorous peer review might eventually require a spectral bound on $\\kappa$ under specific sampling assumptions (e.g., uniform sampling) to fully justify the preconditioner's efficiency."
+            ],
+            "reviewer_name": "gemini_api"
+          },
+          {
+            "issues": [
+              {
+                "location": "Lemma 6 (PCG convergence), and Part 5 convergence claim",
+                "reason": "The cited CG/PCG Chebyshev bound is applied without stating the standard exact-arithmetic hypothesis. The textbook bound is not generally valid verbatim in finite precision.",
+                "required_fix": "Add an explicit hypothesis that the convergence bound is in exact arithmetic (or, alternatively, replace it with a finite-precision PCG result and cite that result).",
+                "severity": "major",
+                "suggestion": "Insert one sentence before the bound: \"In exact arithmetic, standard PCG theory gives...\" and keep the finite-precision discussion separate."
+              },
+              {
+                "location": "Lemma 6, citation line: \"see, e.g., Saad ... Theorem 6.29, or Golub & Van Loan, \u00a711.3\"",
+                "reason": "The citation is not uniquely verifiable: theorem numbering is edition-dependent and two alternative sources are given without precise edition/page/equation mapping to the exact minimax identity used.",
+                "required_fix": "Provide one definitive source with full bibliographic details (authors, title, edition, year) and precise theorem/equation number for the exact bound invoked.",
+                "severity": "major",
+                "suggestion": "Pick one reference (e.g., Saad, 2nd ed.) and cite the exact theorem/equation that states the minimax polynomial bound and the resulting CG error estimate."
+              },
+              {
+                "location": "Gap Closure Notes #10 (\"Cholesky factorizations are ... numerically stable\")",
+                "reason": "This is an external numerical-analysis claim but currently uncited and broader than needed for correctness; stability quality depends on conditioning and implementation details.",
+                "required_fix": "Either remove the unreferenced stability claim or cite a standard source and qualify it appropriately.",
+                "severity": "minor",
+                "suggestion": "If keeping it, cite a standard result (e.g., Higham) and phrase as \"backward stable for SPD systems under standard assumptions.\""
+              }
+            ],
+            "perspective_name": "Reference Validity",
+            "residual_concerns": [
+              "If the pipeline expects fully sourced standard identities, add one linear-algebra citation for the Kronecker/vec identities used repeatedly."
+            ],
+            "reviewer_name": "codex_cli"
+          }
+        ],
+        "summary": "The revised proof is mathematically correct with sound structure and complete coverage of all five claims. The remaining issues are confined to Lemma 6 (PCG convergence), where the PCG-to-CG equivalence needs justification and the exact-arithmetic hypothesis must be stated, plus several one-sentence completeness additions elsewhere (solution uniqueness, intermediate algebra, storage bounds, citation precision). No structural or correctness problems remain.",
+        "verdict": "right_track"
+      },
+      "loop_index": 2
+    },
+    {
+      "editor_decision": {
+        "feedback": "Priority fixes for the prover:\n\n1. **Add a Problem Formulation section before Part 1.** State the optimization objective explicitly, e.g., min_W (1/2) sum_{t=1}^q (y_t - <(KW)_{i_t,:}, z_t>)^2 + (\u03bb/2) tr(W^T K W). Differentiate with respect to vec(W), set the gradient to zero, and identify the resulting normal equations Aw = b. This simultaneously resolves the missing derivation (Reviewer 2) and justifies why only observed entries appear in the RHS (Reviewer 1).\n\n2. **Fix the Saad citation in Lemma 6.** Replace all references to 'Theorem 9.4.12' with the correct locations: cite \u00a76.11.3 (or Theorem 6.29) for the CG Chebyshev/minimax convergence bound, and \u00a79.2 (Algorithm 9.1 and surrounding development) for the PCG-to-CG equivalence. Include page numbers if possible. Also narrow the broad '\u00a79.2\u20139.4' range in Step 1 to the specific sections used.\n\n3. **Fix Lemma 6 Step 1 framing.** Replace 'We give a proof sketch following...' with a direct citation: 'By the equivalence established in Saad (2003, \u00a79.2, Algorithm 9.1), PCG on (A, P) produces iterates satisfying w_m = P^{-1/2} \u0175_m and ||e_m||_A = ||\u00ea_m||_{\u00c2}. We therefore apply standard CG convergence theory to \u00c2.'\n\n4. **Resolve the \u2299 notation collision.** Use \u2218 (or *) for the Hadamard product throughout the proof to distinguish it from the Khatri-Rao product \u2299 used in the problem setup. Add a note in the notation preamble.\n\n5. **Fix Lemma 3 definition of B.** Define B as the observed-entry MTTKRP: B_{i,:} = sum_{t: i_t=i} y_t z_t^T, or equivalently B = (1_\u03a9 \u2218 T_{(k)})Z. Reference the objective function derivation to justify this.\n\n6. **Minor fixes (all straightforward):**\n   - In Part 2, step 2: change C_{i_t,:} += \u03b1_t z_t to C_{i_t,:} += \u03b1_t z_t^T to match Lemma 2.\n   - In Lemma 2 statement: explicitly introduce V \u2208 \u211d^{n\u00d7r} as an input.\n   - In Part 3: add '(assuming multi-indices are stored with observations)' for the on-the-fly z_t cost.\n   - In Part 1: append a sentence on CG search direction non-degeneracy, e.g., 'In exact arithmetic, CG search directions are nonzero and A-conjugate as long as the residual is nonzero (Saad, 2003, Proposition 6.6).'",
+        "feedback_target": "prover",
+        "reviewer_results": [
+          {
+            "issues": [
+              {
+                "location": "Lemma 3 / RHS definition",
+                "reason": "B is defined as T_{(k)}Z (full unfolding times Z) but computed as sparse MTTKRP over observed entries only. These are equal only if unobserved entries are treated as zero, which is never stated or justified. The true T_{(k)} has unknown unobserved entries.",
+                "required_fix": "Explicitly define B as the observed-entry MTTKRP: B_{i,:} = sum_{t: i_t=i} y_t z_t^T, or equivalently B = (1_Omega \u2299 T_{(k)}) Z. State that this arises from the gradient of the observed-entry least-squares objective, not from the full tensor.",
+                "severity": "major",
+                "suggestion": "Add a short derivation showing the optimization objective (observed-entry loss + RKHS regularizer), take its gradient with respect to W, set to zero, and identify A and b. This closes the gap and justifies why only observed entries appear in the RHS."
+              },
+              {
+                "location": "Complete Proof, preamble",
+                "reason": "The linear system Aw = b is presented without derivation. The reader cannot verify it is the correct stationarity condition without knowing the objective function.",
+                "required_fix": "State the optimization problem explicitly (e.g., min_W (1/2) sum_t (y_t - <(KW)_{i_t,:}, z_t>)^2 + (\u03bb/2) tr(W^T K W)) and derive the normal equations to obtain A and b.",
+                "severity": "major",
+                "suggestion": "Insert a short 'Problem Formulation' section before Part 1 that states the objective and derives A, b by differentiating with respect to vec(W) and setting the gradient to zero."
+              },
+              {
+                "location": "Lemma 2 / Part 2 algorithm",
+                "reason": "Notational inconsistency: Lemma 2's proof uses z_t^T (row vector) in the accumulation formula C_{i,:} = sum alpha_t z_t^T, but Part 2's algorithm writes C_{i_t,:} += alpha_t z_t (column vector added to a row).",
+                "required_fix": "Use z_t^T consistently when adding to row slices C_{i_t,:}, or clarify that z_t denotes a row vector in the algorithm pseudocode.",
+                "severity": "minor",
+                "suggestion": "In Part 2 step 2, change 'C_{i_t,:} += alpha_t z_t' to 'C_{i_t,:} += alpha_t z_t^T' to match Lemma 2."
+              },
+              {
+                "location": "Lemma 6, Step 1",
+                "reason": "The step is labeled a 'proof sketch' within what is presented as a full lemma proof. This is inconsistent with the rigor standard. The PCG/CG equivalence is a non-trivial algebraic identity that is asserted but not proved.",
+                "required_fix": "Either (a) prove the equivalence by showing the PCG recurrences produce w_m = P^{-1/2} hat{w}_m explicitly, or (b) clearly state this as a cited theorem: 'By Saad (2003), Proposition 9.1, the PCG iterates satisfy...' and remove the 'proof sketch' framing.",
+                "severity": "minor",
+                "suggestion": "Option (b) is more practical: replace 'We give a proof sketch' with 'By the equivalence established in Saad (2003, \u00a79.2, Algorithm 9.1 and surrounding development), PCG on (A, P) produces iterates satisfying w_m = P^{-1/2} hat{w}_m and ||e_m||_A = ||hat{e}_m||_{hat{A}}. We therefore apply standard CG convergence theory to hat{A}.'"
+              },
+              {
+                "location": "Part 3, on-the-fly z_t generation",
+                "reason": "The cost O(q(d-1)r) for on-the-fly z_t generation omits the cost of decomposing the linear index m_t into the multi-index (j_1,...,j_{k-1},j_{k+1},...,j_d) needed to look up rows of each factor matrix.",
+                "required_fix": "Either assume the multi-index form is stored alongside each observation (cost O(1) lookup), or account for the O(d) integer-division cost per observation.",
+                "severity": "minor",
+                "suggestion": "Add a parenthetical: '(assuming multi-indices are stored with observations, so each factor-row lookup is O(1))' or note the O(qd) decomposition cost is dominated by O(q(d-1)r)."
+              },
+              {
+                "location": "Part 1, CG well-definedness",
+                "reason": "The claim that CG denominators p_j^T A p_j > 0 for nonzero search directions is stated without justification that search directions remain nonzero before convergence.",
+                "required_fix": "Add a brief justification: in exact arithmetic, CG search directions are A-conjugate and nonzero until the residual vanishes (which occurs in at most nr steps).",
+                "severity": "minor",
+                "suggestion": "Append: 'In exact arithmetic, the CG search directions p_0, p_1, ... are nonzero and A-conjugate as long as the residual is nonzero (see Saad, 2003, Proposition 6.6), ensuring p_j^T A p_j > 0 at each iteration.'"
+              }
+            ],
+            "perspective_name": "Correctness & Completeness",
+            "residual_concerns": [
+              "The proof treats K as strictly positive definite throughout but the Assumptions section acknowledges K may be only PSD in practice, deferring to a nugget fix. A brief remark on how the nugget-augmented kernel K + epsilon I inherits all stated properties would improve self-containedness.",
+              "No discussion of how the PCG initial guess w_0 is chosen, though this does not affect correctness of the convergence bound (only the constant ||e_0||_A)."
+            ],
+            "reviewer_name": "claude_code"
+          },
+          {
+            "issues": [
+              {
+                "location": "Lemma 1 and Lemma 2",
+                "reason": "Notation collision: The symbol '\u2299' is used for the Hadamard (element-wise) product in the proof (e.g., 1_\u03a9 \u2299 ...), but it was defined as the Khatri-Rao product in the Mentor's Definitions section (Z := A_d \u2299 ... \u2299 A_1). In a graduate-level text, using the same symbol for two distinct operations creates ambiguity.",
+                "required_fix": "Use a distinct symbol for the Hadamard product (e.g., '\u2218' or '\u2217') or explicitly redefine '\u2299' as the Hadamard product in the Notation section, noting the distinction from the Khatri-Rao product used in the problem setup.",
+                "severity": "major",
+                "suggestion": "Replace the Hadamard product symbol with '\u2218' throughout the proof to distinguish it from the Khatri-Rao product."
+              },
+              {
+                "location": "Lemma 2 Statement",
+                "reason": "Implicit variable definition: The lemma statement refers to 'U' in the algorithm description ('where U=KV'), but 'V' is not defined or introduced in the lemma statement itself. While 'V' is clear from context (Lemma 1), a self-contained lemma should declare its inputs.",
+                "required_fix": "Explicitly introduce V in the lemma statement.",
+                "severity": "minor",
+                "suggestion": "Amend the lemma statement to start with: 'Let V \u2208 \u211d^{n\u00d7r} and define U := KV. The matrix C...'"
+              }
+            ],
+            "perspective_name": "Clarity & Rigor",
+            "residual_concerns": [],
+            "reviewer_name": "gemini_api"
+          },
+          {
+            "issues": [
+              {
+                "location": "Lemma 6 (PCG convergence), Note 3 citation",
+                "reason": "The citation \"Saad (2003), Theorem 9.4.12\" is not verifiable against the cited edition\u2019s chapter structure (Section 9.4 is on flexible variants), so the proof currently relies on an apparent phantom/misindexed theorem for its core convergence claim.",
+                "required_fix": "Replace the citation with the correct, verifiable source locations for (i) the CG Chebyshev/minimax convergence bound and (ii) the PCG-to-CG equivalence transformation.",
+                "severity": "critical",
+                "suggestion": "Cite Saad (2nd ed., 2003) as: Section 6.11.3 (CG convergence theorem/bound, e.g., Theorem 6.29 and derived inequality) plus Section 9.2.1 (Algorithm 9.1/9.2 equivalence for preconditioning). Include page numbers from the exact edition used."
+              },
+              {
+                "location": "Lemma 6, Step 1 (\"following ... \u00a79.2\u20139.4\")",
+                "reason": "The section range is overbroad/inexact for the claim being used; \u00a79.4 is not the natural source for the stated PCG-CG equivalence or CG minimax bound.",
+                "required_fix": "Use precise section-level citations tied to each subclaim instead of a broad range.",
+                "severity": "minor",
+                "suggestion": "Split the citation inline: equivalence claim -> \u00a79.2.1; CG minimax/Chebyshev bound -> \u00a76.11.3. This makes dependency checking straightforward."
+              }
+            ],
+            "perspective_name": "Reference Validity",
+            "residual_concerns": [
+              "If your pipeline requires explicit sourcing for all nontrivial background facts, add brief references for vec-Kronecker identities and Kronecker SPD/eigenvalue properties (currently treated as standard facts without citation)."
+            ],
+            "reviewer_name": "codex_cli"
+          }
+        ],
+        "summary": "The proof architecture is sound and most lemma proofs are rigorous. However, four issues block acceptance: (1) the citation 'Saad (2003), Theorem 9.4.12' appears to be a phantom reference \u2014 the CG Chebyshev bound lives in Chapter 6, not \u00a79.4, undermining verifiability of the convergence argument; (2) the linear system Aw=b is presented without deriving it from an optimization objective, so the reader cannot verify correctness of A and b; (3) Lemma 3 defines B using the full tensor unfolding but computes it from observed entries only, without justifying the equivalence; (4) the symbol \u2299 is used for both Khatri-Rao and Hadamard products. Several minor issues (notation inconsistency in Part 2 vs Lemma 2, 'proof sketch' framing in Lemma 6, missing CG well-definedness justification, incomplete on-the-fly cost assumptions) also need attention.",
+        "verdict": "right_track"
+      },
+      "loop_index": 3
+    },
+    {
+      "editor_decision": {
+        "feedback": "1. **Masking Definition:** Explicitly define $T_{(k)}$ (or a new symbol $Y_{\\text{obs}}$) as the *zero-filled* matrix of observations (0 outside $\\Omega$). The identity $\\mathbf{1}_\\Omega \\circ T_{(k)} = T_{(k)}$ is false if $T_{(k)}$ contains unobserved truth.\n2. **Convergence Derivation:** In Lemma 6, streamline the Chebyshev bound. Use the exact identity $\\operatorname{arccosh}(x) = \\ln(x + \\sqrt{x^2-1})$ instead of an inequality, and remove the unused lower bound involving $\\sqrt{x^2-1}/x$.\n3. **Complexity Precision:** In Part 3, remove the loose uniform bound $O(nqr)$. State the cost as $O(qr + n^2r)$ for cached $z_t$, and explicitly note the $O(qdr)$ dependence if generating $z_t$ on the fly.\n4. **Uniqueness Assumption:** Explicitly assume that observed index pairs $(i_t, m_t)$ are distinct. This is necessary for $S^\\top S = I$ and $P_\\Omega$ to be a projector.\n5. **Vector Notation:** Define $z_t$ explicitly as a column vector ($z_t := Z_{m_t, :}^\\top$) to match its usage in inner products and rank-1 updates.\n6. **Citations:** Update the Saad citation for the PCG equivalence to the section text (e.g., \u00a79.2.1) rather than the algorithm block.",
+        "feedback_target": "prover",
+        "reviewer_results": [
+          {
+            "issues": [
+              {
+                "location": "Lemma 3 (Sparse RHS)",
+                "reason": "The claim that masking is idempotent \u2014 '(1_Omega \u2218 T_(k)) = T_(k)' \u2014 assumes T_(k) is zero outside Omega, which is not stated as an assumption and is false in general tensor completion settings where T is a full tensor with partial observations.",
+                "required_fix": "Either add an explicit assumption that T_(k) is the zero-filled partial observation matrix (zero at unobserved positions), or remove the idempotency claim and instead derive the RHS directly from the gradient of the objective, which only involves observed entries by construction.",
+                "severity": "major",
+                "suggestion": "Add a sentence in the Notation section: 'We define T_(k) as the zero-filled mode-k unfolding: (T_(k))_{i,m} = y_t if (i,m) = (i_t, m_t) \u2208 \u03a9, and 0 otherwise.' This resolves the issue cleanly and makes the idempotency claim trivially true."
+              },
+              {
+                "location": "Part 3 (Complexity of one matvec)",
+                "reason": "The uniform upper bound 'O(nqr) in all cases' does not subsume the on-the-fly cost O(q(d-1)r) when d-1 > n, making the claim incorrect for high-order tensors.",
+                "required_fix": "Either remove the 'in all cases' uniform bound, or state it correctly as O(q\u00b7max(n, d-1)\u00b7r) or simply present the two cases separately without a unified bound.",
+                "severity": "minor",
+                "suggestion": "Replace the sentence with: 'The dominant cost is O(qr + n\u00b2r) with cached z_t, or O(q(d-1)r + n\u00b2r) with on-the-fly generation.' Drop the misleading unified bound."
+              },
+              {
+                "location": "Lemma 6 (PCG convergence), Chebyshev derivation",
+                "reason": "The inequality 'arccosh(x) \u2265 \u221a(x\u00b2-1)/x' is introduced but never used; the proof immediately switches to 'arccosh(x) \u2265 ln(x + \u221a(x\u00b2-1))'. Moreover, arccosh(x) = ln(x + \u221a(x\u00b2-1)) exactly, so writing '\u2265' is misleading.",
+                "required_fix": "Remove the unused inequality. Replace '\u2265' with '=' for arccosh(x) = ln(x + \u221a(x\u00b2-1)).",
+                "severity": "minor",
+                "suggestion": "Write: 'Using arccosh(x) = ln(x + \u221a(x\u00b2-1)) and computing x + \u221a(x\u00b2-1) = (\u221a\u03ba+1)/(\u221a\u03ba-1), we obtain...' This streamlines the argument and removes the dangling step."
+              },
+              {
+                "location": "Notation / Problem Formulation",
+                "reason": "The proof implicitly assumes all observed index pairs (i_t, m_t) are distinct (no repeated observations), which is required for S^T S = I_q and hence P_Omega = SS^T to be an orthogonal projector. This is never stated.",
+                "required_fix": "Add to the Assumptions section: 'Observed indices (i_t, m_t) are distinct for t = 1, ..., q.'",
+                "severity": "minor",
+                "suggestion": "Add this as Assumption 4.5 or append it to Assumption 3. Alternatively, note that if observations can repeat, S^T S is diagonal with counts on the diagonal, which changes the objective to a weighted least squares problem."
+              },
+              {
+                "location": "Lemma 5 (Preconditioner apply)",
+                "reason": "The parenthetical justification for Kronecker SPD \u2014 'eigenvalues are pairwise products of eigenvalues of the factors' \u2014 is stated without derivation. While standard, at graduate rigor this claim should be grounded.",
+                "required_fix": "Add a one-line justification or citation.",
+                "severity": "minor",
+                "suggestion": "Append: '(since A \u2297 B = (Q_A \u2297 Q_B)(\u039b_A \u2297 \u039b_B)(Q_A \u2297 Q_B)^T by spectral decomposition of symmetric matrices, and all products \u03bb_i \u03bc_j > 0).'"
+              }
+            ],
+            "perspective_name": "Correctness & Completeness",
+            "residual_concerns": [
+              "The quality of the preconditioner (how small \u03ba is) depends on the spectral relationship between G_\u03a9 \u2297 K and the true Hessian, which involves sampling balance assumptions mentioned in Assumption 5 but never quantified. This is flagged as a risky step in the mentor output but the proof does not attempt even a rough spectral equivalence bound, leaving the practical convergence rate uncharacterized.",
+              "The proof assumes K \u227b 0 throughout but Assumption 2 mentions the PSD fallback (nugget or range restriction) only in passing. A reader implementing this algorithm needs clearer guidance on detecting and handling the rank-deficient kernel case."
+            ],
+            "reviewer_name": "claude_code"
+          },
+          {
+            "issues": [
+              {
+                "location": "Lemma 6 (PCG convergence), Chebyshev-to-exponential step",
+                "reason": "The arccosh/log transition is written with an incorrect inequality chain (using \">=\" where equality is the exact identity), so the derivation is not logically clean as written.",
+                "required_fix": "Replace the chain with the exact identity arccosh(x)=ln(x+sqrt(x^2-1)) and a direct derivation of 1/T_m((kappa+1)/(kappa-1)) <= 2((sqrt(kappa)-1)/(sqrt(kappa)+1))^m, or cite the standard bound directly.",
+                "severity": "major",
+                "suggestion": "Shorten this part to a standard textbook argument: state the minimax bound, set kappa, invoke the closed-form Chebyshev bound, and avoid unnecessary intermediate inequalities."
+              },
+              {
+                "location": "Problem Formulation and Lemma 3 (definitions of T_(k), B, and observed data)",
+                "reason": "The text alternates between using T_(k) as a generic unfolding and as a zero-filled observed matrix, then uses idempotence (1_Omega \\circ T_(k) = T_(k)). This is ambiguous and can conflict with conventional notation where T is the full latent tensor.",
+                "required_fix": "Introduce a distinct symbol for observed zero-filled unfolding (e.g., Y_Omega := 1_Omega \\circ T_(k)) and use it consistently in b and B definitions.",
+                "severity": "major",
+                "suggestion": "Keep T_(k) for the full tensor unfolding, and write B := Y_Omega Z, b := vec(KB). This removes ambiguity and makes observed-only dependence explicit."
+              },
+              {
+                "location": "Notation + Lemma 2/Part 2 (z_t orientation)",
+                "reason": "z_t is defined as a row selection Z_{m_t,:} but used as a column vector in inner products, updates, and Gram construction; this forces implicit transposes and weakens dimensional clarity.",
+                "required_fix": "Define z_t explicitly as z_t := Z_{m_t,:}^\\top in R^r (column) and make all formulas consistent with that choice.",
+                "severity": "minor",
+                "suggestion": "Add one line early: \"All vectors are columns unless stated otherwise,\" then keep updates in one canonical form."
+              },
+              {
+                "location": "Selection operator definition (S, P_Omega)",
+                "reason": "P_Omega = SS^\\top is called a projector without explicitly stating uniqueness of observed index pairs; with duplicate (i_t,m_t), SS^\\top is not a projector and formulas change.",
+                "required_fix": "State that Omega is a set of unique observed pairs (or pre-aggregate duplicates before defining S).",
+                "severity": "minor",
+                "suggestion": "Add an assumption near notation: \"Each (i_t,m_t) appears at most once; repeated observations are averaged/aggregated beforehand.\""
+              },
+              {
+                "location": "Part 3 (matvec complexity summary)",
+                "reason": "The extra coarse bound O(nqr) (from n<q) weakens the sharper bound O(qr+n^2r) and can confuse the theorem\u2019s stated complexity.",
+                "required_fix": "Keep the primary bound as O(qr+n^2r) (plus optional on-the-fly z_t cost), and remove or clearly label O(nqr) as a loose upper bound.",
+                "severity": "minor",
+                "suggestion": "Report complexity in the same form as the theorem statement to maintain consistency and reduce cognitive load."
+              }
+            ],
+            "perspective_name": "Clarity & Rigor",
+            "residual_concerns": [
+              "A formal references block for Saad (2003) and Higham (2002) is not shown in the proof text; include full bibliographic entries in the final manuscript."
+            ],
+            "reviewer_name": "codex_cli"
+          },
+          {
+            "issues": [
+              {
+                "location": "Part 5 / Lemma 6",
+                "reason": "Citation precision: 'Algorithm 9.1' in Saad (2003) is the pseudocode for PCG. The theoretical equivalence between PCG and standard CG on the transformed system is discussed in the text of Section 9.2 (specifically 9.2.1), not the algorithm block itself.",
+                "required_fix": "Update citation to refer to the section text.",
+                "severity": "minor",
+                "suggestion": "Change 'Saad (2003, \u00a79.2, Algorithm 9.1)' to 'Saad (2003, \u00a79.2.1)' or 'Saad (2003, Section 9.2)'."
+              },
+              {
+                "location": "Part 1",
+                "reason": "Citation relevance: Saad (2003) Proposition 6.6 states that direction vectors are A-conjugate *if* the algorithm does not break down. It does not essentially prove the algorithm is well-defined (i.e., does not break down). Well-definedness for SPD matrices is a broader consequence of the descent property (Prop 6.5) or the convergence theorem.",
+                "required_fix": "None strictly required as the claim is true, but the reference is slightly tangential.",
+                "severity": "minor",
+                "suggestion": "Consider citing 'Saad (2003, Proposition 6.5)' (which relates residuals and directions) or simply referencing 'standard properties of CG for SPD matrices' alongside the convergence theorem."
+              }
+            ],
+            "perspective_name": "Reference Validity",
+            "residual_concerns": [
+              "Assumption 2 mentions handling PSD kernels via a nugget, but the proof strictly assumes K is SPD. This is consistent, but in practice, ensuring the nugget is sufficient to satisfy the condition number assumptions for the Cholesky stability (Higham Thm 10.3) is an implementation detail outside the proof scope."
+            ],
+            "reviewer_name": "gemini_api"
+          }
+        ],
+        "summary": "The proof correctly identifies the PCG approach and derives the matrix-free operations. However, it relies on an ambiguous definition of the unfolded tensor that conflates the full truth with the zero-filled observations, invalidating the masking algebra. The complexity bound is too loose for high-order tensors, and the convergence proof uses unnecessary inequalities. Minor notation issues regarding vector orientation and index uniqueness also need fixing.",
+        "verdict": "right_track"
+      },
+      "loop_index": 4
+    },
+    {
+      "editor_decision": {
+        "feedback": "Priority fixes (must address for acceptance at graduate rigor):\n\n1. **Derive the linear system from the objective (Issues 6, 7).** Add a 'Problem Setup' section before Part 1 that: (a) states the regularized least-squares objective on observed entries with RKHS constraint A_k = KW, (b) differentiates with respect to w = vec(W), (c) sets the gradient to zero to obtain Aw = b, identifying A and b explicitly. This is 5\u20138 lines of displayed math and closes the largest self-containedness gap.\n\n2. **Restrict scope to K\u227b0 or prove the PSD case (Issue 1).** The simplest fix: explicitly restrict the theorem to K\u227b0 (or K + \u03b5I with \u03b5 > 0 absorbed into the model) and state that the PSD case requires a reduced-space formulation that is outside scope. Do NOT leave the PSD alternative as an informal remark \u2014 either prove it or exclude it from the theorem statement.\n\n3. **Prove the masking-projector equivalence (Issue 8).** Promote to a displayed sub-claim within Lemma 1: define S so column t is e_{(i_t-1)M + m_t}, show [SS^T u]_j = u_j if j \u2208 \u03a9 and 0 otherwise, conclude this equals entrywise masking by 1_\u03a9 under column-major vectorization. Reference the distinct-observations assumption. This is 3 lines.\n\n4. **Unify T/T_obs notation (Issues 2, 9).** In the formal definitions (not just clarifications), define B := T_obs Z and b = vec(KB). Update Lemma 3's statement to reference T_obs explicitly. Remove the ambiguous B = TZ.\n\n5. **Formalize the distinct-observations assumption (Issues 3, 14).** Move from 'Clarification' to a numbered assumption in a formal Assumptions section. State: 'The observed index pairs (i_t, m_t) for t=1,...,q are distinct.' Reference this assumption explicitly in Lemma 1 (projector) and Lemma 2 (unique accumulation).\n\nSecondary fixes (important for polish):\n\n6. **Fix transpose typo in theorem statement (Issue 5).** Change C_{i_t,:} += \u03b1_t z_t to C_{i_t,:} += \u03b1_t z_t^T.\n\n7. **Add z_t generation cost to setup complexity (Issue 4).** State: 'If z_t must be generated on-the-fly, setup adds O(q(d-1)r) for G_\u03a9 formation and B computation.'\n\n8. **Remove convergence derivation redundancy (Issue 10).** State the norm equivalence once in Lemma 6; in Part 5, simply invoke Lemma 6.\n\n9. **Restate assumptions in-document (Issue 11).** Add a numbered Assumptions section before Part 1.\n\n10. **Add scope disclaimer for \u03ba (Issue 12).** After the convergence bound, add: 'Bounding \u03ba in terms of problem parameters (q, n, r, \u03bb, \u03b4, spectra of K and Z) is outside the scope of this result; the contribution is the matrix-free algorithmic framework with standard PCG guarantees.'\n\n11. **Fix Saad citation (Issue 13).** Change to 'Saad, Iterative Methods for Sparse Linear Systems, Theorem 6.29 combined with \u00a79.2 (preconditioned CG).'",
+        "feedback_target": "prover",
+        "reviewer_results": [
+          {
+            "issues": [
+              {
+                "location": "Part 1 / Lemma 4 / Assumption 2 (PSD-kernel branch)",
+                "reason": "The SPD proof is only proved for K \u227b 0, but the assumptions allow a PSD-kernel alternative ('solve on range(K)'). In that branch, A on the full space is generally singular, so claim 1 ('A is SPD') is not established as stated.",
+                "required_fix": "Either restrict the theorem to the K \u227b 0 (or nuggeted K + eps I) case, or add a separate reduced-space formulation for K \u2ab0 0 with W constrained to range(K) and prove SPD of the reduced operator.",
+                "severity": "major",
+                "suggestion": "Add an explicit two-case theorem: Case A (nuggeted full-space SPD), Case B (factor K = U\u039bU^T, solve in reduced coordinates with \u039b > 0)."
+              },
+              {
+                "location": "Definitions + Lemma 3 + theorem RHS b",
+                "reason": "The formal statement defines B = T Z, but the proof computes B from observed data using T_obs. If T is interpreted as the full unfolding, b is not computable from sparse observations and does not match the masked normal equations.",
+                "required_fix": "Make T_obs part of the formal definitions and define B := T_obs Z (equivalently b = (Z \u2297 K)^T vec(T_obs)).",
+                "severity": "major",
+                "suggestion": "Move the T_obs clarification into the theorem statement itself so algorithm, linear system, and proof all reference the same object."
+              },
+              {
+                "location": "Clarification (Distinct observations), Lemma 1\u20132",
+                "reason": "Exact identification of P_\u03a9 as a masking projector and loop exactness assumes unique (i_t, m_t). This is stated in clarifications, but not as a formal assumption in the theorem block.",
+                "required_fix": "Add uniqueness (or preprocessing aggregation) to the assumptions, or generalize to weighted duplicates explicitly.",
+                "severity": "minor",
+                "suggestion": "State: 'Input tuples are deduplicated into \u03a9 before forming S and running matvec/RHS accumulation.'"
+              },
+              {
+                "location": "Part 3 (complexity setup)",
+                "reason": "Setup complexity O(qr^2 + n^3 + r^3) omits the cost of generating z_t on-the-fly when sampled rows are not cached.",
+                "required_fix": "Include +O(q(d-1)r) in setup when z_t must be generated to build G_\u03a9 (and optionally B).",
+                "severity": "minor",
+                "suggestion": "Present two explicit complexity regimes: cached sampled z_t versus on-demand z_t generation."
+              }
+            ],
+            "perspective_name": "Correctness & Completeness",
+            "residual_concerns": [
+              "The preconditioner-quality assumption is qualitative; no spectral-equivalence constants are provided, so m is still problem-dependent despite the standard CG bound."
+            ],
+            "reviewer_name": "codex_cli"
+          },
+          {
+            "issues": [
+              {
+                "location": "Theorem statement, claim (2)",
+                "reason": "The algorithm in the theorem uses $C_{i_t,:} \\mathrel{+}= \\alpha_t z_t$ where $z_t$ is a column vector being added to a row. The proof body correctly writes $z_t^\\top$ but the theorem statement is not corrected.",
+                "required_fix": "Replace $C_{i_t,:} \\mathrel{+}= \\alpha_t z_t$ with $C_{i_t,:} \\mathrel{+}= \\alpha_t z_t^\\top$ in the theorem statement, or equivalently state the algorithm in column-vector form throughout.",
+                "severity": "minor",
+                "suggestion": "Since the prover controls the theorem restatement, add a corrected version of the theorem with consistent transpose conventions matching the opening vector-convention clarification."
+              },
+              {
+                "location": "Definitions / preamble",
+                "reason": "The relationship $A_k = KW$ (RKHS parameterization of the mode-$k$ factor) is assumed without motivation. A reader unfamiliar with kernel-based tensor decomposition cannot understand why the linear system $Aw = b$ arises.",
+                "required_fix": "Add 2-3 sentences explaining: $A_k$ is the mode-$k$ CP factor, the RKHS assumption means each column of $A_k$ lies in the RKHS of $K$, so $A_k = KW$ by the representer theorem, and $W$ contains the representer coefficients.",
+                "severity": "major",
+                "suggestion": "Insert a short 'Problem Setup' paragraph before Part 1 that states the objective function and derives the normal equations, making the proof fully self-contained."
+              },
+              {
+                "location": "Preamble / before Part 1",
+                "reason": "The linear system $Aw = b$ is the object the entire proof concerns, yet it is never derived from an optimization problem. The reader must accept it axiomatically.",
+                "required_fix": "State the optimization objective (regularized least-squares on observed entries in the RKHS) and show the first-order condition yields $Aw = b$ with the given $A$ and $b$.",
+                "severity": "major",
+                "suggestion": "A displayed 3-line derivation suffices: write the objective, differentiate with respect to $w$, set to zero, and identify $A$ and $b$. This closes the largest self-containedness gap."
+              },
+              {
+                "location": "Lemma 1 proof, masking-projector equivalence",
+                "reason": "The equivalence $P_\\Omega \\mathrm{vec}(G) = \\mathrm{vec}(\\mathbf{1}_\\Omega \\odot G)$ is the algebraic linchpin of the matrix-free reformulation, yet it is asserted in a parenthetical remark rather than proved.",
+                "required_fix": "Provide an explicit argument: define $S$ so that the $t$-th column is $e_{(i_t-1)M + m_t}$ (standard basis vector in $\\mathbb{R}^{nM}$), then $[SS^\\top u]_j = u_j$ if $j$ corresponds to some $(i_t, m_t) \\in \\Omega$, and $0$ otherwise, which is the entrywise masking by $\\mathbf{1}_\\Omega$ under the chosen vectorization.",
+                "severity": "major",
+                "suggestion": "Promote this to a displayed sub-claim within Lemma 1 with a 2-3 line proof. Reference the distinct-observations assumption here to justify that $SS^\\top$ is a projector (no double-counting)."
+              },
+              {
+                "location": "Lemma 3 / Gap Closure Note 1",
+                "reason": "The mentor's $B = TZ$ is ambiguous \u2014 $T$ could mean the full unfolding or $T_{\\text{obs}}$. The clarification at the top says masked references to $T$ mean $T_{\\text{obs}}$, but $B = TZ$ is not syntactically a 'masked expression' (no $\\mathbf{1}_\\Omega$ appears).",
+                "required_fix": "In Lemma 3 or the definitions section, explicitly redefine $B := T_{\\text{obs}} Z$ and note that this equals $TZ$ only when $T$ is understood as the zero-filled observation matrix.",
+                "severity": "minor",
+                "suggestion": "A single sentence at the point of definition suffices. The Gap Closure Note already addresses this but the in-line proof text should be unambiguous on its own."
+              },
+              {
+                "location": "Part 5 and Lemma 6",
+                "reason": "The norm equivalence $\\|e_m\\|_A = \\|\\hat{e}_m\\|_{\\hat{A}}$ is derived twice (in Part 5 and again in Lemma 6), creating redundancy and mild notational inconsistency.",
+                "required_fix": "State and verify the norm equivalence once (in Lemma 6 is natural) and reference it from Part 5.",
+                "severity": "minor",
+                "suggestion": "In Part 5, write: 'Since $A \\succ 0$ and $P \\succ 0$, Lemma 6 gives...' and move the norm-equivalence calculation entirely into Lemma 6."
+              },
+              {
+                "location": "Assumptions section",
+                "reason": "Assumptions are listed in the mentor output but not restated in the proof. The proof references 'Assumption 1,' 'Assumption 2' etc. without an in-document anchor.",
+                "required_fix": "Either restate the assumptions in a numbered list within the proof document, or add a clear forward-reference ('see Assumptions 1-5 in the Mentor section').",
+                "severity": "minor",
+                "suggestion": "For a self-contained proof, restate the assumptions in a dedicated section before Part 1. This is standard practice for graduate-level manuscripts."
+              },
+              {
+                "location": "Theorem, claim (5) / Part 5",
+                "reason": "The condition number $\\kappa$ is never bounded in terms of problem parameters. The theorem makes a convergence claim parameterized by $\\kappa$ but provides no guidance on when $\\kappa$ is small. Assumption 5 is qualitative only ('not pathologically imbalanced').",
+                "required_fix": "Add an explicit remark that bounding $\\kappa$ in terms of $(q, n, r, \\lambda, \\delta, \\sigma(K), \\sigma(Z))$ is outside the scope of this result, and that the contribution is the matrix-free algorithmic framework with standard PCG guarantees.",
+                "severity": "minor",
+                "suggestion": "A one-sentence scope disclaimer after the convergence bound prevents misreading the theorem as providing an end-to-end complexity guarantee. Optionally, note that $\\kappa \\to 1$ as $\\delta \\to 0$ and $G_\\Omega \\to Z^\\top Z$ (full observation), giving intuition."
+              }
+            ],
+            "perspective_name": "Clarity & Rigor",
+            "residual_concerns": [
+              "The proof never addresses numerical stability beyond the mentor's Risky Step 5. For a complete computational mathematics treatment, a remark on floating-point conditioning of the Cholesky factors and potential need for iterative refinement would strengthen the exposition.",
+              "The notation $C_{i_t,:} \\mathrel{+}=$ uses imperative/algorithmic syntax inside a mathematical proof, which is common in computational math but may draw objections from pure-math reviewers. Consider framing the accumulation as a summation identity and presenting the algorithm separately."
+            ],
+            "reviewer_name": "claude_code"
+          },
+          {
+            "issues": [
+              {
+                "location": "Part 5 (Convergence) and Clarification (Saad PCG reference)",
+                "reason": "Citation Imprecision. The prover cites 'Saad, \u00a79.2.1' as the source for the convergence bound. In Saad (2nd Ed.), \u00a79.2.1 covers the definition of Preconditioned CG (Left/Split), but the convergence bound itself is derived from the standard CG theory in Chapter 6 (e.g., Theorem 6.29) applied to the preconditioned spectrum.",
+                "required_fix": "Update the citation to point to the correct theorem or section in Saad that establishes the convergence bound.",
+                "severity": "minor",
+                "suggestion": "Change the reference to 'Saad, Theorem 6.29 combined with Section 9.2' or simply 'Standard CG theory (e.g., Saad, Ch. 6)'."
+              },
+              {
+                "location": "Definitions / Lemma 1 Proof",
+                "reason": "Implicit Assumption Formalization. The proof relies on $P_\\Omega = SS^\\top$ being a projector, which requires $S^\\top S = I_q$. This holds only if the observed indices $(i_t, m_t)$ are distinct. While the prover notes this in the 'Clarification', it is a constraint on the input data $\\Omega$ that should be listed in the formal 'Assumptions' section of the theorem to ensure the operator $\\mathcal{A}(V)$ is well-defined.",
+                "required_fix": "Move the 'Distinct observations' clarification into the formal Assumptions list.",
+                "severity": "minor",
+                "suggestion": "Add 'The observed index pairs in $\\Omega$ are distinct' to the Assumptions section."
+              }
+            ],
+            "perspective_name": "Reference Validity",
+            "residual_concerns": [],
+            "reviewer_name": "gemini_api"
+          }
+        ],
+        "summary": "The proof's core mathematical content is sound: the SPD argument, matrix-free matvec via sampled accumulation, sparse RHS, Kronecker-factored preconditioner, and Chebyshev-based PCG convergence bound are all correctly argued. However, five major and nine minor issues remain. The most significant gaps are (a) the linear system Aw=b is never derived from an optimization objective, leaving the reader unable to verify correctness of the system itself, (b) the SPD claim is only proved for K\u227b0 while the theorem's scope implicitly includes K\u2ab00, (c) the masking-projector equivalence is asserted without proof, and (d) formal definitions inconsistently use T vs T_obs. These are expositional and scoping issues, not structural flaws \u2014 the proof strategy is correct and all fixes are achievable within the current framework.",
+        "verdict": "right_track"
+      },
+      "loop_index": 5
+    }
+  ],
+  "max_loops": 5,
+  "meta_path": "/home/matt.linux/misc/first_proof/runs/10/20260211-204521-meta.json",
+  "problem_id": "10",
+  "researcher_text": "## Relevant Theorems\n\n- **PCG Convergence Bound (Exact Arithmetic):** For a symmetric positive definite (SPD) system $Ax=b$ preconditioned by SPD matrix $P$, the error $e_m = w_m - w_*$ at iteration $m$ satisfies:\n  \\[\n  \\|e_m\\|_A \\le 2 \\left( \\frac{\\sqrt{\\kappa}-1}{\\sqrt{\\kappa}+1} \\right)^m \\|e_0\\|_A, \\quad \\text{where } \\kappa = \\kappa(P^{-1/2} A P^{-1/2}).\n  \\]\n  **Source:** Saad, Y., *Iterative Methods for Sparse Linear Systems*, 2nd ed., SIAM, 2003.\n  - **Theorem 6.29** (Chebyshev minimax bound for standard CG).\n  - **Section 9.2.1** (Equivalence of PCG to standard CG on the transformed system $\\hat{A} = P^{-1/2} A P^{-1/2}$).\n\n- **Kronecker-Vec Identity:** For matrices $A, B, X$ of compatible dimensions:\n  \\[\n  (B^\\top \\otimes A) \\operatorname{vec}(X) = \\operatorname{vec}(AXB).\n  \\]\n  (Magnus & Neudecker, *Matrix Differential Calculus*, 2019).\n\n- **Kronecker Product Properties:**\n  - **Inverse:** $(A \\otimes B)^{-1} = A^{-1} \\otimes B^{-1}$ (if $A, B$ invertible).\n  - **SPD:** If $A \\succ 0$ and $B \\succ 0$, then $A \\otimes B \\succ 0$.\n  - **Transpose:** $(A \\otimes B)^\\top = A^\\top \\otimes B^\\top$.\n\n- **Cholesky Stability:** The Cholesky factorization of an SPD matrix is backward stable.\n  **Source:** Higham, N. J., *Accuracy and Stability of Numerical Algorithms*, 2nd ed., SIAM, 2002, Theorem 10.3.\n\n## Key Definitions\n\n- **Dimensions:** $n = n_k$ (mode size), $M = \\prod_{i \\neq k} n_i$, $N = nM$. Rank $r$.\n- **Observations:** A set $\\Omega = \\{(i_t, m_t)\\}_{t=1}^q \\subset [n] \\times [M]$ of $q$ **distinct** index pairs. Observed values $y_t$.\n- **Zero-filled Observation Matrix:** Let $Y_\\Omega \\in \\mathbb{R}^{n \\times M}$ be defined by $(Y_\\Omega)_{i,m} = y_t$ if $(i,m) = (i_t, m_t) \\in \\Omega$, and $0$ otherwise. Note that $Y_\\Omega = \\mathbf{1}_\\Omega \\circ T_{(k)}$ where $T_{(k)}$ is the full unfolding.\n- **Selection Matrix:** $S \\in \\mathbb{R}^{N \\times q}$ has columns $e_{\\varphi(i_t, m_t)}$ where $\\varphi$ is the column-major bijection. $P_\\Omega = SS^\\top$ is the orthogonal projector onto observed entries.\n- **Khatri-Rao Product:** $Z \\in \\mathbb{R}^{M \\times r}$.\n- **Sampled Row Vector:** $z_t := (Z_{m_t, :})^\\top \\in \\mathbb{R}^r$ (defined as a **column vector**).\n- **Objective Function:**\n  \\[\n  \\min_{W} \\frac{1}{2} \\| P_\\Omega (\\operatorname{vec}(T_{(k)}) - (Z \\otimes K)\\operatorname{vec}(W)) \\|_2^2 + \\frac{\\lambda}{2} \\operatorname{vec}(W)^\\top (I_r \\otimes K) \\operatorname{vec}(W).\n  \\]\n- **Linear System:** The normal equations $Aw = b$ where:\n  \\[\n  A = (Z \\otimes K)^\\top P_\\Omega (Z \\otimes K) + \\lambda (I_r \\otimes K),\n  \\]\n  \\[\n  b = (Z \\otimes K)^\\top \\operatorname{vec}(Y_\\Omega) = \\operatorname{vec}(K B), \\quad \\text{with } B = Y_\\Omega Z.\n  \\]\n- **Preconditioner:** $P = (G_\\Omega + \\lambda I_r) \\otimes (K + \\delta I_n)$, where $G_\\Omega = \\sum_{t=1}^q z_t z_t^\\top$.\n\n## Proof Strategies\n\n1.  **Derivation of Normal Equations:** Start explicitly from the optimization objective. Show that $\\nabla f(w) = 0$ leads to $Aw = b$. Use the definition of $Y_\\Omega$ to rigorously show $P_\\Omega \\operatorname{vec}(T_{(k)}) = \\operatorname{vec}(Y_\\Omega)$, justifying the sparse RHS computation.\n2.  **SPD Property:** Prove $A \\succ 0$ using $K \\succ 0$ and $\\lambda > 0$. Conclude the system has a unique solution.\n3.  **Matrix-Free Matvec:** Prove $A \\operatorname{vec}(V) = \\operatorname{vec}(\\mathcal{A}(V))$ where $\\mathcal{A}(V) = K [ (\\mathbf{1}_\\Omega \\circ (KVZ^\\top))Z + \\lambda V ]$. Implement this via a sparse accumulation loop over $t=1,\\dots,q$ using $z_t$ as column vectors.\n4.  **Preconditioner Application:** Show $P^{-1} \\operatorname{vec}(R)$ corresponds to solving two Sylvester-like equations via Cholesky factors.\n5.  **Convergence Analysis:**\n    -   Invoke Saad \u00a79.2.1 to establish equivalence between PCG on $(A, P)$ and CG on $\\hat{A} = P^{-1/2} A P^{-1/2}$.\n    -   Apply the Chebyshev bound (Saad Thm 6.29) to $\\hat{A}$.\n    -   Derive the convergence rate $2((\\sqrt{\\kappa}-1)/(\\sqrt{\\kappa}+1))^m$ using the exact identity $\\operatorname{arccosh}(x) = \\ln(x + \\sqrt{x^2-1})$.\n6.  **Complexity Analysis:**\n    -   Matvec: $O(qr + n^2r)$ (cached $z_t$) or $O(q(d-1)r + n^2r)$ (on-the-fly).\n    -   Preconditioner Apply: $O(n^2r + nr^2)$.\n    -   Setup: $O(qr^2 + n^3 + r^3)$.\n    -   Verify no $O(N)$ operations.\n\n## Gaps and Concerns\n\n-   **Uniqueness Assumption:** The proof must explicitly state that the observed pairs $(i_t, m_t)$ are distinct so that $S^\\top S = I_q$ and $P_\\Omega$ is a projector.\n-   **Masking Algebra:** The previous confusion between $T_{(k)}$ (full) and masked data must be resolved by using $Y_\\Omega$ (zero-filled) in the derivation of $b$.\n-   **Vector Orientation:** Ensure consistent use of $z_t$ as a column vector in inner products ($\\langle u, z_t \\rangle$) and rank-1 updates ($z_t z_t^\\top$).\n-   **Complexity Precision:** Avoid the loose $O(nqr)$ bound; stick to the precise sum of terms.\n-   **Citation Specificity:** Ensure the Saad citations point to the text of \u00a79.2.1 and \u00a76.11.3/Thm 6.29, not the algorithm block or incorrect sections.",
+  "started_at": "2026-02-11T20:45:21.899837+00:00",
+  "transcript_path": "/home/matt.linux/misc/first_proof/runs/10/20260211-204521-transcript.md"
+}
