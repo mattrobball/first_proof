@@ -129,7 +129,7 @@ def test_randomize_assigns_all_roles() -> None:
         randomize_agents=True,
     )
     _router, assignments = build_backend_from_config(fc, seed=42)
-    expected_roles = {"researcher", "mentor", "prover", "editor_dispatch", "editor_decision"}
+    expected_roles = {"researcher", "mentor", "prover", "editor_dispatch", "editor_decision", "grader_decision"}
     assert set(assignments) == expected_roles
     # Only pool entries are eligible — "defaults" is never selected
     valid_pool_names = {"reviewer_a", "reviewer_b"}

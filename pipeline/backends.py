@@ -263,6 +263,31 @@ class DemoBackend:
                 f"```json\n{json.dumps(payload, indent=2)}\n```\n"
             )
 
+        if role == "grader_decision":
+            payload = {
+                "progress_grade": 2,
+                "error_incorrect_logic": "true",
+                "error_hallucinated": "false",
+                "error_calculation": "false",
+                "error_conceptual": "false",
+                "achievement_understanding": "true",
+                "achievement_correct_result": "not_sure",
+                "achievement_insight": "true",
+                "achievement_usefulness": "true",
+                "short_summary": (
+                    "The solution attempt demonstrates understanding of the problem "
+                    "and identifies the right approach, but contains a logical error "
+                    "in the main argument that prevents it from being a complete proof."
+                ),
+            }
+            return (
+                "## Grading Decision\n"
+                "After reviewing the solution attempt and synthesizing reviewer feedback, "
+                "the attempt shows substantial progress but falls short of a complete solution.\n\n"
+                "## Grade\n"
+                f"```json\n{json.dumps(payload, indent=2)}\n```\n"
+            )
+
         raise ValueError(f"Unsupported role for backend output: {role}")
 
 
@@ -417,6 +442,7 @@ def _build_single_backend(cfg: AgentModelConfig, workdir: Path | None = None) ->
 
 _NON_REVIEWER_ROLES = (
     "researcher", "mentor", "prover", "editor_dispatch", "editor_decision",
+    "grader_decision",
 )
 
 

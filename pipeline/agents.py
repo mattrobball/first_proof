@@ -10,6 +10,7 @@ ROLE_TO_TEMPLATE = {
     "editor_dispatch": "editor_dispatch.md",
     "editor_decision": "editor_decision.md",
     "reviewer": "reviewer.md",
+    "grader_decision": "grader_decision.md",
 }
 
 

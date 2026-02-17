@@ -49,7 +49,7 @@ from .validate import (
 )
 
 
-def _reviews_to_markdown(reviewer_results: list[ReviewerResult]) -> str:
+def reviews_to_markdown(reviewer_results: list[ReviewerResult]) -> str:
     lines: list[str] = []
     idx = 0
     for rr in reviewer_results:
@@ -63,14 +63,14 @@ def _reviews_to_markdown(reviewer_results: list[ReviewerResult]) -> str:
     return "\n".join(lines) if lines else "None."
 
 
-def _build_pool_description(pool_names: list[str]) -> str:
+def build_pool_description(pool_names: list[str]) -> str:
     if not pool_names:
         return "No reviewers available."
     lines = [f"- **{name}**" for name in pool_names]
     return "\n".join(lines)
 
 
-def _build_perspectives_description(
+def build_perspectives_description(
     perspectives: list[tuple[str, str]],
 ) -> str:
     lines = []
@@ -132,7 +132,7 @@ def _aggregate_issue_counts(loops: list[LoopRecord]) -> dict[str, int]:
     return counts
 
 
-def _build_json_fix_prompt(original_output: str, error_message: str) -> str:
+def build_json_fix_prompt(original_output: str, error_message: str) -> str:
     """Construct a reprompt asking the LLM to return corrected JSON."""
     return (
         "Your previous response contained a JSON block that failed validation.\n\n"
@@ -231,8 +231,8 @@ def run_pipeline(
     ]
     perspective_names = [p.name for p in config.reviewer_perspectives]
 
-    pool_desc = _build_pool_description(pool_names)
-    persp_desc = _build_perspectives_description(perspective_pairs)
+    pool_desc = build_pool_description(pool_names)
+    persp_desc = build_perspectives_description(perspective_pairs)
 
     researcher_text = loops[-1].researcher_text if loops else ""
 
@@ -310,7 +310,7 @@ def run_pipeline(
             )
         except OutputValidationError as exc:
             _status(f"[retry] editor dispatch: {exc}")
-            fix_prompt = _build_json_fix_prompt(dispatch_text, str(exc))
+            fix_prompt = build_json_fix_prompt(dispatch_text, str(exc))
             dispatch_text = backend.generate(
                 "editor_dispatch", fix_prompt, dispatch_context
             )
@@ -346,7 +346,7 @@ def run_pipeline(
                 )
             except OutputValidationError as exc:
                 _status(f"[retry] reviewer {persp_name}: {exc}")
-                fix_prompt = _build_json_fix_prompt(reviewer_text, str(exc))
+                fix_prompt = build_json_fix_prompt(reviewer_text, str(exc))
                 reviewer_text = backend.generate_with_pool(
                     assigned_pool, "reviewer", fix_prompt, reviewer_context
                 )
@@ -377,7 +377,7 @@ def run_pipeline(
 
         # --- Editor decision ---
         _status(f"[loop {loop_index}/{config.max_loops}] editor decision ...")
-        reviews_md = _reviews_to_markdown(reviewer_results)
+        reviews_md = reviews_to_markdown(reviewer_results)
         decision_context = dict(dispatch_context)
         decision_context["reviews_markdown"] = reviews_md
         decision_prompt = render_prompt("editor_decision", decision_context)
@@ -388,7 +388,7 @@ def run_pipeline(
             verdict, summary, feedback = parse_editor_decision_output(decision_text)
         except OutputValidationError as exc:
             _status(f"[retry] editor decision: {exc}")
-            fix_prompt = _build_json_fix_prompt(decision_text, str(exc))
+            fix_prompt = build_json_fix_prompt(decision_text, str(exc))
             decision_text = backend.generate(
                 "editor_decision", fix_prompt, decision_context
             )
@@ -617,7 +617,7 @@ def _resolve_checkpoint(value: str, problem_dir: Path) -> Path:
     )
 
 
-def _resolve_backend(
+def resolve_backend(
     config: PipelineConfig, problem_dir: Path
 ) -> BackendRouter:
     """Build the appropriate backend: config-file router or legacy single."""
@@ -657,7 +657,7 @@ _EXPORT_RE = re.compile(
 )
 
 
-def _load_secrets(*search_dirs: Path) -> None:
+def load_secrets(*search_dirs: Path) -> None:
     """Load ``export KEY=value`` lines from the first ``.secrets`` file found."""
     for d in search_dirs:
         secrets = d / ".secrets"
@@ -683,7 +683,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     problem_dir = _resolve_problem_dir(args.problem)
-    _load_secrets(problem_dir, Path.cwd())
+    load_secrets(problem_dir, Path.cwd())
     ensure_problem_files(problem_dir, repo_root=Path.cwd())
 
     try:
@@ -745,7 +745,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"(loop {len(resume_data.loops)})",
                 file=sys.stderr,
             )
-        backend = _resolve_backend(config, problem_dir)
+        backend = resolve_backend(config, problem_dir)
         result = run_pipeline(
             problem_dir=problem_dir,
             config=config,

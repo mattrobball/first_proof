@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 
+from .grading_models import GradingDecision, GradingIndicators
 from .models import EditorDispatch, EditorVerdict, ReviewerIssue, ReviewerResult, Severity
 
 REQUIRED_HEADINGS: dict[str, list[str]] = {
@@ -31,6 +32,9 @@ REQUIRED_HEADINGS: dict[str, list[str]] = {
 
 VALID_SEVERITIES: set[str] = {"critical", "major", "minor"}
 VALID_EDITOR_VERDICTS: set[str] = {"accept", "right_track", "wrong_track"}
+VALID_TRI_STATE: set[str] = {"true", "false", "not_sure"}
+VALID_TRI_STATE_PLUS: set[str] = {"true", "false", "not_sure", "not_applicable"}
+VALID_PROGRESS_GRADES: set[int] = {0, 1, 2, 3, 4}
 
 
 class OutputValidationError(ValueError):
@@ -189,3 +193,65 @@ def parse_editor_decision_output(
 
     typed_verdict: EditorVerdict = verdict
     return typed_verdict, summary, feedback
+
+
+def parse_grading_decision_output(
+    text: str,
+    reviewer_results: list[ReviewerResult],
+) -> GradingDecision:
+    payload = _extract_json_block(text, "Grading decision")
+
+    progress_grade = payload.get("progress_grade")
+    if not isinstance(progress_grade, int) or progress_grade not in VALID_PROGRESS_GRADES:
+        raise OutputValidationError(
+            f"Grading decision progress_grade must be one of {sorted(VALID_PROGRESS_GRADES)}"
+        )
+
+    # Validate tri-state error indicators
+    _TRI_FIELDS = [
+        "error_incorrect_logic",
+        "error_hallucinated",
+        "error_calculation",
+        "error_conceptual",
+        "achievement_understanding",
+        "achievement_insight",
+        "achievement_usefulness",
+    ]
+    for field_name in _TRI_FIELDS:
+        val = payload.get(field_name)
+        if val not in VALID_TRI_STATE:
+            raise OutputValidationError(
+                f"Grading decision {field_name} must be one of {sorted(VALID_TRI_STATE)}"
+            )
+
+    # achievement_correct_result allows "not_applicable" too
+    acr = payload.get("achievement_correct_result")
+    if acr not in VALID_TRI_STATE_PLUS:
+        raise OutputValidationError(
+            f"Grading decision achievement_correct_result must be one of "
+            f"{sorted(VALID_TRI_STATE_PLUS)}"
+        )
+
+    short_summary = payload.get("short_summary", "")
+    if not isinstance(short_summary, str) or not short_summary.strip():
+        raise OutputValidationError(
+            "Grading decision short_summary must be a non-empty string"
+        )
+
+    indicators = GradingIndicators(
+        error_incorrect_logic=payload["error_incorrect_logic"],
+        error_hallucinated=payload["error_hallucinated"],
+        error_calculation=payload["error_calculation"],
+        error_conceptual=payload["error_conceptual"],
+        achievement_understanding=payload["achievement_understanding"],
+        achievement_correct_result=payload["achievement_correct_result"],
+        achievement_insight=payload["achievement_insight"],
+        achievement_usefulness=payload["achievement_usefulness"],
+    )
+
+    return GradingDecision(
+        progress_grade=progress_grade,
+        indicators=indicators,
+        short_summary=short_summary.strip(),
+        reviewer_results=reviewer_results,
+    )

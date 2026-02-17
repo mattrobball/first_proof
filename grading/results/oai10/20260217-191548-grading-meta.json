@@ -1,0 +1,172 @@
+{
+  "attempt_label": "oai10",
+  "cost": "~29,455 tokens (23,461 in, 5,994 out), est. cost ~$0.37",
+  "finished_at": "2026-02-17T19:19:00.461326+00:00",
+  "grading_decision": {
+    "indicators": {
+      "achievement_correct_result": "true",
+      "achievement_insight": "true",
+      "achievement_understanding": "true",
+      "achievement_usefulness": "true",
+      "error_calculation": "false",
+      "error_conceptual": "false",
+      "error_hallucinated": "false",
+      "error_incorrect_logic": "false"
+    },
+    "progress_grade": 4,
+    "reviewer_results": [
+      {
+        "issues": [
+          {
+            "location": "Preconditioner motivation (SS^T \u2248 \u03c1I)",
+            "reason": "SS^T is a binary diagonal matrix (a projection), not \u03c1I. The approximation requires an expected-value argument under uniform random sampling that is never stated. Without this, the preconditioner has no formal justification.",
+            "required_fix": "State that under independent uniform sampling with probability \u03c1, E[SS^T] = \u03c1I, and that concentration inequalities (or empirical experience) ensure spectral closeness for large q. Cite or sketch the argument.",
+            "severity": "major",
+            "suggestion": "Add a paragraph: 'When entries are observed independently with probability \u03c1, E[SS^T] = \u03c1I_N. By matrix concentration (e.g., matrix Chernoff bounds), SS^T \u2248 \u03c1I spectrally with high probability when q is large, justifying the Kronecker approximation.'"
+          },
+          {
+            "location": "Problem setup / representer theorem",
+            "reason": "The problem states mode k is infinite-dimensional in an RKHS, but the solution assumes without justification that the optimization reduces to a finite n\u00d7n system via A_k = KW. The representer theorem argument that justifies this reduction is missing entirely.",
+            "required_fix": "Add a paragraph establishing that by the representer theorem, the optimal solution for the RKHS-constrained mode lies in the span of the kernel evaluations at the n data points, reducing the infinite-dimensional problem to solving for W \u2208 R^{n\u00d7r}.",
+            "severity": "major",
+            "suggestion": "Before the main derivation, state: 'By the representer theorem for RKHS-regularized problems, the optimal A_k lies in the span of {k(x_i, \u00b7)}_{i=1}^n, so A_k = KW for some W \u2208 R^{n\u00d7r}, where K_{ij} = k(x_i, x_j). This reduces the infinite-dimensional problem to the finite system (95).'"
+          },
+          {
+            "location": "Notation (\u2299 overloading)",
+            "reason": "The symbol \u2299 is used for both the Khatri-Rao product (Z = A_d \u2299 \u00b7\u00b7\u00b7 \u2299 A_1) and the Hadamard (elementwise) product in equation (97). This dual usage is standard in tensor literature but creates ambiguity within a single document.",
+            "required_fix": "Use distinct notation: e.g., \u2299 for Khatri-Rao and * or \u2218 for Hadamard, or explicitly clarify at each use.",
+            "severity": "minor",
+            "suggestion": "Add a note after the notation section: 'We use \u2299 for the Khatri-Rao product between tall factor matrices and \u2218 (or *) for the elementwise (Hadamard) product between matrices of equal size.' Then update (97) accordingly."
+          },
+          {
+            "location": "SPD verification of operator A",
+            "reason": "The proof claims the operator is SPD and that CG applies, but does not verify positive definiteness. While straightforward (\u03bb > 0 and K \u227b 0 suffice), the claim should be justified since it is a prerequisite for the entire method.",
+            "required_fix": "Add a brief verification: x^T A x = ||S^T(Z\u2297K)x||\u00b2 + \u03bb x^T(I_r\u2297K)x > 0 for x \u2260 0 when K \u227b 0 and \u03bb > 0.",
+            "severity": "minor",
+            "suggestion": "Insert after equation (95): 'The operator is SPD: for any nonzero x, x^TAx = ||S^T(Z\u2297K)x||\u00b2 + \u03bb\u00b7x^T(I_r\u2297K)x. The first term is nonneg and the second is positive when K \u227b 0 and \u03bb > 0, so CG is applicable.'"
+          },
+          {
+            "location": "Equation (98), vec-Kronecker identity",
+            "reason": "The derivation jumps from \u03a3 s_\u2113(z_\u2113 \u2297 Ke_{i_\u2113}) to vec(K \u03a3 e_{i_\u2113} s_\u2113 z_\u2113^T) without citing the identity vec(abc^T) = (c \u2297 a)b used here. At graduate rigor, this step should be explicit.",
+            "required_fix": "State the identity: z_\u2113 \u2297 Ke_{i_\u2113} = vec(Ke_{i_\u2113} z_\u2113^T) by the standard vec-Kronecker relation.",
+            "severity": "minor",
+            "suggestion": "Add inline: 'Using the identity vec(uv^T) = v \u2297 u, we have z_\u2113 \u2297 Ke_{i_\u2113} = vec(Ke_{i_\u2113}z_\u2113^T), so the sum becomes vec(K \u03a3_\u2113 e_{i_\u2113} s_\u2113 z_\u2113^T).'"
+          },
+          {
+            "location": "Complexity of Z_\u03a9 construction",
+            "reason": "The parenthetical claim that Z_\u03a9 can be built in O(qr) 'if factor rows are accessed efficiently' is incorrect \u2014 the (d-1) factor is inherent in computing products over d-1 modes and cannot be removed by access patterns alone.",
+            "required_fix": "Remove the parenthetical or clarify that O(qr) holds only when d is treated as a constant.",
+            "severity": "minor",
+            "suggestion": "Replace with: 'O(qr(d\u22121)) multiplications, or O(qr) when d is treated as a fixed constant.'"
+          },
+          {
+            "location": "PCG convergence analysis",
+            "reason": "The convergence section only states the generic CG convergence bound and a heuristic argument that eigenvalues cluster when the mask is uniform. No quantitative bound on \u03ba(P^{-1}A) is given in terms of (n, r, q, \u03c1). The 'fast convergence' claim is empirical, not proven.",
+            "required_fix": "Either provide a bound on \u03ba(P^{-1}A) under stated assumptions (e.g., using matrix concentration results) or explicitly acknowledge that the fast convergence claim is heuristic/empirical.",
+            "severity": "minor",
+            "suggestion": "Add: 'A rigorous bound on \u03ba(P^{-1}A) under random sampling can be obtained via matrix concentration inequalities (e.g., [cite relevant work]), but in practice T_cg is observed to be small and roughly independent of problem size. We note that the convergence claim here is supported by empirical evidence rather than a formal spectral bound.'"
+          },
+          {
+            "location": "Gram matrix identity (103)",
+            "reason": "The Hadamard-product identity for the Gram matrix of a Khatri-Rao product is stated without proof or reference. While well-known, at graduate rigor a one-line verification or citation strengthens the exposition.",
+            "required_fix": "Add a brief derivation or cite a standard reference (e.g., Kolda & Bader 2009).",
+            "severity": "minor",
+            "suggestion": "Add: 'This follows because (Z^TZ)_{s,t} = \u03a3_j \u03a0_{m\u2260k} A_m(i_m^(j),s)A_m(i_m^(j),t) = \u03a0_{m\u2260k} \u03a3_{i_m} A_m(i_m,s)A_m(i_m,t) = \u03a0_{m\u2260k}(A_m^TA_m)_{s,t}; see [Kolda & Bader, SIAM Review 2009].'"
+          }
+        ],
+        "perspective_name": "Correctness & Completeness",
+        "residual_concerns": [
+          "The solution does not address numerical stability concerns: when kernel eigenvalues \u03c3_i span many orders of magnitude, the diagonal scaling in (104) may suffer from catastrophic cancellation or overflow. A brief discussion of numerical safeguards would be appropriate.",
+          "The relationship between the nugget parameter \u03b5 and the regularization parameter \u03bb is not discussed \u2014 in practice these interact and affect both the preconditioner quality and the condition number.",
+          "No mention is made of how to choose a stopping criterion for PCG that is appropriate for the outer ALS loop (e.g., inexact solves with decreasing tolerance)."
+        ],
+        "reviewer_name": "claude_code"
+      },
+      {
+        "issues": [
+          {
+            "location": "PCG formulation (system (95), SPD claim paragraph)",
+            "reason": "CG/PCG requires an SPD operator, but the assumptions ensuring SPD are not fully stated (notably lambda > 0). The text discusses K being PD or nuggeted, but does not explicitly enforce lambda > 0 in the theorem-level statement.",
+            "required_fix": "State explicit solvability assumptions: lambda > 0 and K \u2ab0 0 (or K + epsilon I with epsilon > 0), then prove A is SPD under these assumptions.",
+            "severity": "major",
+            "suggestion": "Add a short lemma: x^T A x = ||S^T(Z \u2297 K)x||_2^2 + lambda x^T(I_r \u2297 K)x, and conclude strict positivity under the stated conditions."
+          },
+          {
+            "location": "A Kronecker preconditioner from mean masking (Eq. 102)",
+            "reason": "The replacement SS^T \u2248 rho I is introduced as a practical step but without a precise sampling model; as written it can read like an identity rather than a model-based approximation.",
+            "required_fix": "Specify the mask model (e.g., uniformly random observed entries) and clarify that the preconditioner is based on an expected operator approximation, not exact algebra.",
+            "severity": "major",
+            "suggestion": "Add one sentence with E[SS^T] = rho I under the model, plus a caveat that performance may degrade under structured missingness."
+          },
+          {
+            "location": "Why PCG converges quickly",
+            "reason": "The claim that SS^T is spectrally close to rho I and that eigenvalues cluster is asserted without quantitative conditions, proof sketch, or citation.",
+            "required_fix": "Either provide a concrete bound with conditions (sample size/coherence assumptions) or label this as heuristic/empirical behavior with citation.",
+            "severity": "major",
+            "suggestion": "Include a citation to a concentration result for random masks and tie it explicitly to kappa(P^{-1/2}AP^{-1/2})."
+          },
+          {
+            "location": "Eq. (104) and matrix-free matvec algorithm",
+            "reason": "Notation collisions reduce precision: r denotes both CP rank and residual vector; U denotes both eigenvectors of K and a temporary matrix U = KX.",
+            "required_fix": "Rename overloaded symbols to avoid conflicts (e.g., rank R, residual g, temporary Q = KX).",
+            "severity": "major",
+            "suggestion": "Add a compact notation table with dimensions and reserve symbols globally."
+          },
+          {
+            "location": "Observed-index notation and Eq. (100)",
+            "reason": "The mapping from tensor multi-index to unfolding column index j_l is implicit, and duplicate observations are not discussed; this leaves scatter formulas slightly under-specified.",
+            "required_fix": "Define the unfolding map explicitly and state whether Omega is duplicate-free (or how duplicates are aggregated).",
+            "severity": "minor",
+            "suggestion": "Add one line defining j_l = pi_k((i_m^(l))_{m \u2260 k}) and a note on pre-aggregation if duplicates exist."
+          },
+          {
+            "location": "Eqs. (97)\u2013(99)",
+            "reason": "z_l is used as both row and column in different places; transposes are inferable but not consistently explicit.",
+            "required_fix": "Fix a single convention (e.g., z_l in R^r column) and write z_l^T only when a row is required.",
+            "severity": "minor",
+            "suggestion": "At first use, annotate key objects with shapes and keep that convention throughout derivations."
+          },
+          {
+            "location": "Complexity section",
+            "reason": "Complexity statements rely on hidden assumptions (dense K matvec at O(n^2 r), cheap row access for all fixed factors), which are not stated explicitly.",
+            "required_fix": "State computational assumptions upfront and separate dense-kernel cost from structured/approximate-kernel variants.",
+            "severity": "minor",
+            "suggestion": "Add a short assumptions line before complexity and optionally one alternative line for low-rank/fast-kernel settings."
+          }
+        ],
+        "perspective_name": "Clarity & Rigor",
+        "residual_concerns": [
+          "The algorithm specification omits an explicit stopping rule (relative residual tolerance, max iterations), which weakens reproducibility at graduate rigor."
+        ],
+        "reviewer_name": "codex_cli"
+      },
+      {
+        "issues": [
+          {
+            "location": "Section 'A Kronecker preconditioner from mean masking'",
+            "reason": "The text justifies the preconditioner by stating that $S S^T \\approx \\rho I$ is a 'common and effective approximation' when the mask is uniform. This appeals to external results regarding the spectral properties of random sampling operators (concentration of measure) without citation or proof.",
+            "required_fix": "Cite a standard reference in the matrix or tensor completion literature that establishes the validity or common usage of this approximation.",
+            "severity": "minor",
+            "suggestion": "Include a citation to foundational works in tensor completion (e.g., Kolda & Bader) or matrix completion (e.g., Cand\u00e8s & Recht) where this spectral approximation is discussed."
+          },
+          {
+            "location": "Section 'Why PCG converges quickly'",
+            "reason": "The text invokes 'standard PCG theory' to provide a specific convergence bound inequality. While the result is correct, graduate-level rigor requires citing a specific source when invoking a named theorem or bound.",
+            "required_fix": "Provide a bibliographic reference for the PCG convergence theorem.",
+            "severity": "minor",
+            "suggestion": "Cite a standard numerical linear algebra text, such as Saad's 'Iterative Methods for Sparse Linear Systems' or Golub & Van Loan."
+          }
+        ],
+        "perspective_name": "Reference Validity",
+        "residual_concerns": [],
+        "reviewer_name": "gemini_api"
+      }
+    ],
+    "short_summary": "The solution correctly derives a matrix-free PCG algorithm with a Kronecker-structured preconditioner, efficiently handling the sparse observations and RKHS constraints. The approach avoids O(N) computations as required. Reviewer critiques regarding the rigorous probabilistic justification of the preconditioner and the representer theorem are either minor expositional points or outside the scope of the specific prompt."
+  },
+  "meta_path": "/home/matt.linux/misc/first_proof/grading/results/oai10/20260217-191548-grading-meta.json",
+  "problem_id": "10",
+  "report_path": "/home/matt.linux/misc/first_proof/grading/results/oai10/20260217-191548-grading-report.md",
+  "started_at": "2026-02-17T19:15:48.805202+00:00",
+  "transcript_path": "/home/matt.linux/misc/first_proof/grading/results/oai10/20260217-191548-grading-transcript.md"
+}
