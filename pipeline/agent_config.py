@@ -68,6 +68,7 @@ _PROVIDER_DEFAULTS: dict[str, dict[str, str]] = {
 _CLI_DEFAULTS: dict[str, str] = {
     "codex": "codex",
     "claude": "claude",
+    "gemini": "gemini",
 }
 
 
@@ -206,6 +207,7 @@ APPROVED_BACKENDS: frozenset[tuple[str, str, str]] = frozenset({
     ("cli", "claude", "claude-opus-4-6"),
     ("cli", "codex", "gpt-5.3-codex"),
     ("api", "gemini", "gemini-3-pro-preview"),
+    ("cli", "gemini", "gemini-3-pro-preview"),
 })
 
 

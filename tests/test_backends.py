@@ -327,3 +327,138 @@ def test_codex_backend_retries_with_highest_supported_effort(
     assert len(seen_args) == 2
     assert 'model_reasoning_effort="xhigh"' in seen_args[0]
     assert 'model_reasoning_effort="high"' in seen_args[1]
+
+
+# ---------------------------------------------------------------------------
+# GeminiCLIBackend
+# ---------------------------------------------------------------------------
+
+
+def test_gemini_cli_backend_invokes_gemini_p(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_which(binary: str) -> str:
+        assert binary == "gemini"
+        return "/usr/bin/gemini"
+
+    def fake_run(*run_args: object, **kwargs: object) -> SimpleNamespace:
+        assert len(run_args) == 1
+        args = run_args[0]
+        assert isinstance(args, list)
+        seen["args"] = args
+        seen["kwargs"] = kwargs
+        return SimpleNamespace(returncode=0, stdout="proof output here", stderr="")
+
+    monkeypatch.setattr("pipeline.cli_backends.shutil.which", fake_which)
+    monkeypatch.setattr("pipeline.cli_backends.subprocess.run", fake_run)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key-123")
+
+    from pipeline.cli_backends import GeminiCLIBackend
+
+    cfg = AgentModelConfig(
+        backend="cli", provider="gemini", model="gemini-3-pro-preview",
+    )
+    backend = GeminiCLIBackend(cfg=cfg)
+    text = backend.generate("prover", "prove this theorem", {})
+
+    assert text == "proof output here"
+    args = seen["args"]
+    assert isinstance(args, list)
+    assert args[0] == "/usr/bin/gemini"
+    assert "-p" in args
+    assert "prove this theorem" in args
+    assert "-m" in args
+    model_idx = args.index("-m")
+    assert args[model_idx + 1] == "gemini-3-pro-preview"
+    # Prompt is passed as argument, not via stdin
+    kwargs = seen["kwargs"]
+    assert isinstance(kwargs, dict)
+    assert "input" not in kwargs or kwargs.get("input") is None
+
+
+def test_gemini_cli_backend_nonzero_exit_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_which(binary: str) -> str:
+        return "/usr/bin/gemini"
+
+    def fake_run(*run_args: object, **kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(returncode=1, stdout="", stderr="auth error")
+
+    monkeypatch.setattr("pipeline.cli_backends.shutil.which", fake_which)
+    monkeypatch.setattr("pipeline.cli_backends.subprocess.run", fake_run)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+    from pipeline.cli_backends import GeminiCLIBackend
+
+    cfg = AgentModelConfig(backend="cli", provider="gemini", model="gemini-3-pro-preview")
+    backend = GeminiCLIBackend(cfg=cfg)
+    with pytest.raises(RuntimeError, match="exit code 1"):
+        backend.generate("prover", "prompt", {})
+
+
+def test_gemini_cli_backend_empty_output_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_which(binary: str) -> str:
+        return "/usr/bin/gemini"
+
+    def fake_run(*run_args: object, **kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("pipeline.cli_backends.shutil.which", fake_which)
+    monkeypatch.setattr("pipeline.cli_backends.subprocess.run", fake_run)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+    from pipeline.cli_backends import GeminiCLIBackend
+
+    cfg = AgentModelConfig(backend="cli", provider="gemini", model="gemini-3-pro-preview")
+    backend = GeminiCLIBackend(cfg=cfg)
+    with pytest.raises(RuntimeError, match="empty output"):
+        backend.generate("prover", "prompt", {})
+
+
+def test_gemini_cli_backend_missing_api_key_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_which(binary: str) -> str:
+        return "/usr/bin/gemini"
+
+    monkeypatch.setattr("pipeline.cli_backends.shutil.which", fake_which)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    from pipeline.cli_backends import GeminiCLIBackend
+
+    cfg = AgentModelConfig(backend="cli", provider="gemini", model="gemini-3-pro-preview")
+    backend = GeminiCLIBackend(cfg=cfg)
+    with pytest.raises(ValueError, match="GEMINI_API_KEY"):
+        backend.generate("prover", "prompt", {})
+
+
+def test_gemini_cli_backend_omits_model_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_which(binary: str) -> str:
+        return "/usr/bin/gemini"
+
+    def fake_run(*run_args: object, **kwargs: object) -> SimpleNamespace:
+        args = run_args[0]
+        assert isinstance(args, list)
+        seen["args"] = args
+        return SimpleNamespace(returncode=0, stdout="OK", stderr="")
+
+    monkeypatch.setattr("pipeline.cli_backends.shutil.which", fake_which)
+    monkeypatch.setattr("pipeline.cli_backends.subprocess.run", fake_run)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+    from pipeline.cli_backends import GeminiCLIBackend
+
+    cfg = AgentModelConfig(backend="cli", provider="gemini", model="")
+    backend = GeminiCLIBackend(cfg=cfg)
+    _ = backend.generate("prover", "prompt", {})
+    args = seen["args"]
+    assert isinstance(args, list)
+    assert "-m" not in args
+
+
+def test_build_single_backend_gemini_cli(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("pipeline.cli_backends.shutil.which", lambda b: f"/usr/bin/{b}")
+
+    cfg = AgentModelConfig(backend="cli", provider="gemini", model="gemini-3-pro-preview")
+    backend = _build_single_backend(cfg)
+    from pipeline.cli_backends import GeminiCLIBackend
+    assert isinstance(backend, GeminiCLIBackend)

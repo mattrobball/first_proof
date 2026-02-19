@@ -12,8 +12,7 @@ provider = "codex"
 model    = "gpt-5.3-codex"
 reasoning_effort = "xhigh"
 
-[agent_pool.gemini_api]
-backend  = "api"
+[agent_pool.gemini_cli]
+backend  = "cli"
 provider = "gemini"
 model    = "gemini-3-pro-preview"
-reasoning_effort = "high"

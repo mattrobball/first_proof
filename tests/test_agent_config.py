@@ -311,6 +311,9 @@ def _approved_config(**pool_overrides: dict) -> PipelineFileConfig:
         "gemini_api": AgentModelConfig(
             backend="api", provider="gemini", model="gemini-3-pro-preview",
         ),
+        "gemini_cli": AgentModelConfig(
+            backend="cli", provider="gemini", model="gemini-3-pro-preview",
+        ),
         **pool_overrides,
     }
     # Defaults from first pool entry (mirrors no-[defaults] behaviour)
@@ -348,7 +351,7 @@ def test_unapproved_model_rejected() -> None:
 def test_all_pool_entries_validated() -> None:
     fc = _approved_config(
         bad_reviewer=AgentModelConfig(
-            backend="cli", provider="gemini", model="gemini-3-pro-preview",
+            backend="api", provider="openai", model="gpt-4o",
         ),
     )
     with pytest.raises(ValueError, match="agent_pool.bad_reviewer"):
@@ -403,3 +406,33 @@ def test_claude_effort_from_config() -> None:
     assert "--effort" in cmd
     idx = cmd.index("--effort")
     assert cmd[idx + 1] == "high"
+
+
+def test_gemini_cli_resolved_cli_command() -> None:
+    cfg = AgentModelConfig(provider="gemini")
+    assert cfg.resolved_cli_command() == "gemini"
+    cfg2 = AgentModelConfig(provider="gemini", cli_command="my-gemini")
+    assert cfg2.resolved_cli_command() == "my-gemini"
+
+
+def test_gemini_cli_command_construction() -> None:
+    from unittest.mock import patch
+
+    cfg = AgentModelConfig(
+        backend="cli", provider="gemini", model="gemini-3-pro-preview",
+    )
+    with patch("shutil.which", return_value="/usr/bin/gemini"):
+        from pipeline.cli_backends import GeminiCLIBackend
+        backend = GeminiCLIBackend(cfg=cfg)
+    cmd = backend._command("test prompt")
+    assert cmd[0] == "/usr/bin/gemini"
+    assert "-p" in cmd
+    assert "test prompt" in cmd
+    assert "-m" in cmd
+    idx = cmd.index("-m")
+    assert cmd[idx + 1] == "gemini-3-pro-preview"
+
+
+def test_gemini_cli_approved_backend() -> None:
+    key = ("cli", "gemini", "gemini-3-pro-preview")
+    assert key in APPROVED_BACKENDS

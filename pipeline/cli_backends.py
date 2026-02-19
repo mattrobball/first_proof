@@ -7,12 +7,14 @@ Supported CLI tools:
 
   * **codex** – ``codex exec -`` (OpenAI Codex CLI).
   * **claude** – ``claude -p`` (Anthropic Claude Code CLI).
+  * **gemini** – ``gemini -p`` (Google Gemini CLI).
   * Any other CLI that reads a prompt from stdin and writes its response to
     stdout can be used by setting ``cli_command`` to the binary name.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -222,6 +224,93 @@ class ClaudeCLIBackend:
 
 
 # ---------------------------------------------------------------------------
+# Gemini CLI
+# ---------------------------------------------------------------------------
+
+@dataclass
+class GeminiCLIBackend:
+    """Runs one ``gemini -p`` invocation per agent turn.
+
+    Uses the Google Gemini CLI (google-gemini/gemini-cli) in non-interactive
+    mode.  Authentication is via the ``GEMINI_API_KEY`` environment variable.
+    """
+
+    cfg: AgentModelConfig
+    workdir: Path | None = None
+
+    def __post_init__(self) -> None:
+        binary = self.cfg.resolved_cli_command()
+        resolved = shutil.which(binary)
+        if resolved is None:
+            raise RuntimeError(
+                f"Could not find Gemini CLI binary '{binary}' in PATH"
+            )
+        self._resolved_bin = resolved
+
+    def _command(self, prompt: str) -> list[str]:
+        cmd = [self._resolved_bin, "-p", prompt]
+        if self.cfg.model:
+            cmd.extend(["-m", self.cfg.model])
+        return cmd
+
+    def _build_env(self) -> dict[str, str]:
+        """Build subprocess environment, ensuring GEMINI_API_KEY is set."""
+        env = dict(os.environ)
+        api_key_env = self.cfg.api_key_env or "GEMINI_API_KEY"
+        key = env.get(api_key_env, "")
+        if not key:
+            raise ValueError(
+                f"Environment variable '{api_key_env}' is not set "
+                f"(required for Gemini CLI backend)"
+            )
+        # The Gemini CLI reads GEMINI_API_KEY (or GOOGLE_API_KEY).
+        # Ensure it is available under the name the CLI expects.
+        if api_key_env != "GEMINI_API_KEY":
+            env["GEMINI_API_KEY"] = key
+        return env
+
+    @staticmethod
+    def _trim(text: str, limit: int = 4000) -> str:
+        cleaned = text.strip()
+        if len(cleaned) <= limit:
+            return cleaned
+        return cleaned[: limit - 3] + "..."
+
+    def generate(self, role: str, prompt: str, context: dict[str, str]) -> str:
+        cmd = self._command(prompt)
+        cwd = str(self.workdir) if self.workdir else None
+        env = self._build_env()
+
+        proc = subprocess.run(
+            cmd,
+            text=True,
+            capture_output=True,
+            check=False,
+            cwd=cwd,
+            env=env,
+        )
+
+        if proc.returncode == 0:
+            text = proc.stdout.strip()
+            if text:
+                _cost_tracker.record(
+                    self.cfg.provider, self.cfg.model or "",
+                    estimate_tokens(prompt), estimate_tokens(text),
+                    estimated=True,
+                )
+                return text
+            raise RuntimeError(
+                f"Gemini CLI returned empty output for role '{role}'"
+            )
+
+        stderr_snippet = self._trim(proc.stderr)
+        raise RuntimeError(
+            f"Gemini CLI failed for role '{role}' with exit code "
+            f"{proc.returncode}. stderr: {stderr_snippet!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Generic CLI (stdin → stdout)
 # ---------------------------------------------------------------------------
 
@@ -283,11 +372,13 @@ class GenericCLIBackend:
 
 def build_cli_backend(
     cfg: AgentModelConfig, workdir: Path | None = None
-) -> CodexCLIBackend | ClaudeCLIBackend | GenericCLIBackend:
+) -> CodexCLIBackend | ClaudeCLIBackend | GeminiCLIBackend | GenericCLIBackend:
     """Construct the right CLI backend based on *cfg*."""
     provider = cfg.provider.lower()
     if provider == "codex":
         return CodexCLIBackend(cfg=cfg, workdir=workdir)
     if provider == "claude":
         return ClaudeCLIBackend(cfg=cfg, workdir=workdir)
+    if provider == "gemini":
+        return GeminiCLIBackend(cfg=cfg, workdir=workdir)
     return GenericCLIBackend(cfg=cfg, workdir=workdir)
