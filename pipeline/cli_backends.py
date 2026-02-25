@@ -232,7 +232,9 @@ class GeminiCLIBackend:
     """Runs one ``gemini -p`` invocation per agent turn.
 
     Uses the Google Gemini CLI (google-gemini/gemini-cli) in non-interactive
-    mode.  Authentication is via the ``GEMINI_API_KEY`` environment variable.
+    mode with ``--yolo`` to auto-approve tool calls (sandbox enabled by
+    default).  Authentication is via the ``GEMINI_API_KEY`` environment
+    variable.
     """
 
     cfg: AgentModelConfig
@@ -248,7 +250,7 @@ class GeminiCLIBackend:
         self._resolved_bin = resolved
 
     def _command(self, prompt: str) -> list[str]:
-        cmd = [self._resolved_bin, "-p", prompt]
+        cmd = [self._resolved_bin, "-p", prompt, "--yolo"]
         if self.cfg.model:
             cmd.extend(["-m", self.cfg.model])
         return cmd
